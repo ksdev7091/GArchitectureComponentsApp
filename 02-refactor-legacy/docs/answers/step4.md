@@ -76,11 +76,20 @@ fun `Repository から最初の値が届くまでは isLoading が true`() = run
 // DataModule.kt(実験用)
 @Binds
 abstract fun bindTodoRepository(impl: FakeTodoRepository): TodoRepository
+
+// src/main に移した FakeTodoRepository(実験用)
+// Hilt は Kotlin のデフォルト引数を知らないので、引数なしのコンストラクタにする
+@Singleton
+class FakeTodoRepository @Inject constructor() : TodoRepository {
+    private val todos = MutableStateFlow<List<Todo>>(emptyList())
+    private var nextId = 1L
+    ...(メソッドは src/test 版と同じ)
+}
 ```
 
-`FakeTodoRepository` を `src/main` に移し、`@Inject constructor()` を付ければビルドが通り、
-起動時は空、追加すれば増え、**アプリを終了すると消える** Todo アプリになります。
-`MainActivity` / `TodoViewModel` / `TodoScreen` は 1 文字も変えていません。
+これでビルドが通り、起動時は空、追加すれば増え、**アプリを終了すると消える** Todo アプリになります。
+`MainActivity` / `TodoAdapter` / `TodoViewModel` は 1 文字も変えていません。
+`@Singleton` を付けるのは、ViewModel が作り直されても同じインスタンス(同じメモリ上のリスト)を使うためです。
 
 これが依存性注入の「対応表を 1 か所変えるだけで、実装を丸ごと差し替えられる」という性質です。
 01-new-app では同じ仕組みを flavor(`src/demo` と `src/prod` の `RemoteModule`)で使い、

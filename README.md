@@ -51,7 +51,7 @@ android-architecture-learning/
 - `local.properties` の `sdk.dir` がこの PC の SDK パスを指しています。別の PC では Android Studio が自動生成します。
 - 01 は Build Variants で `demoDebug`(疑似リモート、既定)か `prodDebug`(Retrofit で公開 API に接続)を選びます。
 - 02 では実行構成のドロップダウンから `step0-legacy` 〜 `step5-compose` を選んで実行します。
-- 単体テスト: 01 は `./gradlew testDemoDebugUnitTest`(24 件)、02 は `./gradlew testDebugUnitTest`(Step 4・5 に各 4 件)。
+- 単体テスト: 01 は `./gradlew testDemoDebugUnitTest`(25 件)、02 は `./gradlew testDebugUnitTest`(Step 4・5 に各 4 件)。
 - 01 の `NoteDaoTest` は端末/エミュレータで動く Instrumented Test です(`./gradlew connectedDebugAndroidTest`)。
 - Windows でフォルダのパスが極端に長い場所(260 文字近く)に置くと、`compileDebugJavaWithJavac` で jlink の起動に失敗することがあります。
   `C:\Users\<name>\AndroidStudioProjects\` のような通常の場所に置いてください。

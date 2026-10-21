@@ -33,12 +33,18 @@
 
 ### 0-3 ★ 回転中のクラッシュを再現する
 
-`loadTodos()` の `Thread { ... }` の先頭に `Thread.sleep(3000)` を入れ、起動直後に画面を回転させてください。
-何が起きるか観察し、`MainActivity.kt` のコメント②と照らし合わせてください。
+`loadTodos()` の `Thread { ... }` の中、`val db = dbHelper.readableDatabase` の**直後**に `Thread.sleep(3000)` を入れ、
+起動直後に画面を回転させてください。何が起きるか観察し、`MainActivity.kt` のコメント②と照らし合わせてください。
+次に、同じ `sleep` を `Thread { ... }` の**先頭**(`readableDatabase` を取る前)に移して、挙動の違いを説明してください。
 
 ---
 
 ## Step 1 (repository)
+
+Step 1〜3 のモジュールにはテスト用の依存が入っていません(テストは Step 4 で初めて足すため)。
+この節と Step 2 の演習でテストを書くときは、先に `build.gradle.kts` に
+`testImplementation(libs.junit)` と `testImplementation(libs.kotlinx.coroutines.test)` を足し、
+Step 4 の `src/test/.../testing/MainDispatcherRule.kt` をコピーしてください。
 
 ### 1-1 ★★ FakeTodoRepository を書く(軸 B)
 
@@ -139,7 +145,8 @@ UI も ViewModel も触らずに「DB を使わないアプリ」になること
 ### 5-1 ★★ 完了済みを隠すトグル、Compose 版(軸 A)
 
 4-1 のトグルを Step 5 の `TodoScreen` に実装してください(Material3 の `Switch` または `Checkbox`)。
-条件: 状態なし版 `TodoScreen` に `onHideDoneChange: (Boolean) -> Unit` を追加し、ViewModel とテストは 4-1 のまま変えない。
+条件: 4-1 で変更した `TodoViewModel.kt` と `TodoViewModelTest.kt` を step5-compose にコピーし、それ以上は触らない。
+UI 側は状態なし版 `TodoScreen` に `onHideDoneChange: (Boolean) -> Unit` を追加する。
 
 0-1 / 2-1 / 3-1 / 5-1 の 4 回で、変更箇所がどう変わったかを表にまとめてください。
 

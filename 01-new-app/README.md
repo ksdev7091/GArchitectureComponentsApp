@@ -16,7 +16,7 @@ Android Studio の **Build Variants** ウィンドウで `demoDebug` / `prodDebu
 | flavor | リモートの実装 | 同期ボタンの挙動 |
 |---|---|---|
 | `demo`(既定) | `FakeNoteRemoteDataSource`(ネットワークに出ない) | 1.2 秒後に 3 件のメモを取り込む。3 回に 1 回は失敗して Snackbar が出る |
-| `prod` | `RetrofitNoteRemoteDataSource`(Retrofit + OkHttp) | 公開 API [JSONPlaceholder](https://jsonplaceholder.typicode.com/posts) から 100 件の投稿をメモとして取り込む(要インターネット) |
+| `prod` | `RetrofitNoteRemoteDataSource`(Retrofit + OkHttp) | 公開 API [JSONPlaceholder](https://jsonplaceholder.typicode.com/posts) から 100 件の投稿をメモとして取り込む(要インターネット)。この API は更新日時を返さないので、同期のたびに 100 件の更新日時が取り込み時刻になる |
 
 両者の違いは `src/demo` と `src/prod` にある `RemoteModule`(Hilt)の 1 行だけで、Repository / ViewModel / UI は共通です。
 Retrofit 実装の正しさは、端末なしで動く MockWebServer のテスト(`RetrofitNoteRemoteDataSourceTest`)で検証しています。
@@ -55,7 +55,7 @@ app/src/main/java/com/example/archnotes/
 app/src/demo/java/.../data/di/RemoteModule.kt   demo: Fake を選ぶ
 app/src/prod/java/.../data/di/RemoteModule.kt   prod: Retrofit を選ぶ
 
-app/src/test/        JVM 単体テスト 24 件(ViewModel × 2, UseCase, Repository, Retrofit + MockWebServer)と Fake / テストルール
+app/src/test/        JVM 単体テスト 25 件(ViewModel × 2, UseCase, Repository, Retrofit + MockWebServer)と Fake / テストルール
 app/src/androidTest/ Room DAO の Instrumented Test
 docs/                演習問題(exercises.md)と解答例(answers.md)
 ```

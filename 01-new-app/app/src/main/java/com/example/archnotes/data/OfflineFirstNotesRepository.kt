@@ -67,7 +67,9 @@ class OfflineFirstNotesRepository @Inject constructor(
                     remoteId = network.id.toString(),
                     title = network.title,
                     body = network.body,
-                    // サーバーが更新日時を返さない場合は「取り込んだ時刻」を更新日時とする
+                    // サーバーが更新日時を返さない場合は「取り込んだ時刻」を更新日時とする。
+                    // (prod の JSONPlaceholder は updated_at を返さないので、同期のたびに全件が同じ時刻になり、
+                    //  一覧の並びは同期直後のものになる。本物の API なら更新日時を返してもらうのが筋)
                     updatedAt = network.updatedAt ?: importedAt,
                 )
             }

@@ -58,11 +58,16 @@ fun observeDoneCount(): Flow<Int>
 ## 3-3 Flow が本当に「勝手に流れてくる」ことを確かめる
 
 Database Inspector で行を INSERT すると、**Step 3 では画面が即座に更新されます**。
-Room が `todos` テーブルへの書き込みを検知し、`observeAll()` の Flow が新しいリストを流し、
-`combine` → `stateIn` → `collect` → `render` と伝わるからです。
+`observeAll()` の Flow が新しいリストを流し、`combine` → `stateIn` → `collect` → `render` と伝わるからです。
 アプリ側のコードは何もしていません。
 
+細かい補足: Room が変更を検知する仕組み(InvalidationTracker)は、同じアプリ内の Room 経由の書き込みを追跡するものです。
+Database Inspector は外部から書き込んだあとに Room の再クエリを**明示的に要求**しているので反映されます。
+アプリ外の別プロセスが DB ファイルを直接書き換えた場合は、Room は気づきません。
+
 **Step 2 では更新されません。** `loadTodos()` を誰かが呼ぶまで、ViewModel は古いリストを持ち続けます。
-画面を回転しても ViewModel は生き残るので、古いままです。アプリを再起動して初めて反映されます。
+画面を回転しても ViewModel は生き残るので、古いままです。
+追加・完了・削除のどれかを操作すれば `loadTodos()` が走って反映されますが、
+「操作しない限り古い」という状態を人間が管理していることに変わりはありません。
 
 「書いたら読み直す」をプログラマが管理する(Step 2)と、変更を Room が通知する(Step 3)の違いが、ここで目に見えます。

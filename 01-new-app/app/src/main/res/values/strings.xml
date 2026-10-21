@@ -8,7 +8,7 @@
     <string name="notes_sync">サーバーと同期</string>
     <string name="notes_add">メモを追加</string>
     <string name="notes_delete">削除</string>
-    <string name="notes_refresh_failed">同期に失敗しました（疑似ネットワークエラー）。もう一度お試しください。</string>
+    <string name="notes_refresh_failed">同期に失敗しました。もう一度お試しください。</string>
     <string name="notes_deleted">メモを削除しました</string>
 
     <!-- 編集画面 -->

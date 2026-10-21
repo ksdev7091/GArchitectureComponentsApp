@@ -24,14 +24,8 @@ private val visibleTodos = ArrayList<Todo>()   // 表示用(フィルタ後)  �
 override fun onCreate(savedInstanceState: Bundle?) {
     ...
     hideDoneCheck = findViewById(R.id.hide_done)
-    hideDoneCheck.isChecked = savedInstanceState?.getBoolean("hide_done") ?: false // 回転対策
     hideDoneCheck.setOnCheckedChangeListener { _, _ -> applyFilter() }
     ...
-}
-
-override fun onSaveInstanceState(outState: Bundle) {
-    super.onSaveInstanceState(outState)
-    outState.putBoolean("hide_done", hideDoneCheck.isChecked)
 }
 
 private fun applyFilter() {
@@ -42,12 +36,16 @@ private fun applyFilter() {
 
 // loadTodos() の runOnUiThread 内: todos を入れ替えたあとに applyFilter() を呼ぶ
 // updateSummary() は todos(全件)を使うので変更なし
-// TodoAdapter の getCount/getItem/getItemId は visibleTodos を参照するように変更
+// TodoAdapter の getCount/getItem/getItemId に加えて、getView の `val todo = todos[position]` も
+// visibleTodos を参照するように変更(忘れると、隠したあとに行の内容がずれる)
 ```
 
 **観察してほしいこと**
 - 「全件」と「表示用」の 2 つのリストを Activity が手で同期している。`applyFilter()` の呼び忘れがそのままバグになる。
-- 回転対策を `onSaveInstanceState` で自前実装している(CheckBox は View の状態として復元されるが、`applyFilter()` を呼ぶタイミングが `onCreate` 後になるので、`loadTodos()` の完了後にフィルタがかかるよう順序に注意が必要)。
+- 回転: `CheckBox` は id があれば View の状態として自動で復元され、復元時にリスナーも発火する。
+  ただし復元は `onCreate` 直後で、`loadTodos()` の完了(別スレッド)より前なので、
+  `applyFilter()` が空の `todos` に対して走り、そのあと `loadTodos()` の完了時にもう一度 `applyFilter()` が必要になる。
+  「どのタイミングで何が復元され、いつデータが揃うか」を Activity のライフサイクルに沿って自分で追いかける必要がある。
 - このロジックが正しいかを確かめる方法は、エミュレータでチェックを入れて目で見るしかない。
 
 ## 0-2 集計のバグをテストで捕まえられるか
@@ -66,9 +64,15 @@ Step 2 でこの計算は `TodoUiState.doneCount` に移り、Step 4 で実際�
 
 ## 0-3 回転中のクラッシュを再現する
 
-`Thread.sleep(3000)` の間に回転すると、
-- 古い Activity は `onDestroy` → `dbHelper.close()` を実行する
-- 3 秒後、まだ生きている Thread が `dbHelper.readableDatabase` を触り、`IllegalStateException`(接続プールが閉じている)でクラッシュする
-- クラッシュしないタイミングでも、`runOnUiThread` は古い Activity の `adapter` / `summaryText` を更新する(新しい Activity には反映されない)
+**`val db = dbHelper.readableDatabase` の直後に sleep を入れた場合**: 回転中に
+- 古い Activity の `onDestroy` → `dbHelper.close()` が走り、取得済みの `db` が閉じられる
+- 3 秒後、Thread が `db.query(...)` を呼び、
+  `IllegalStateException: attempt to re-open an already-closed object: SQLiteDatabase ...todo.db` でクラッシュする
 
-Thread は Activity の寿命を知らない、というのがコメント②の意味です。Step 1 の `lifecycleScope` が「続きの処理」をキャンセルし、Step 2 で DbHelper をアプリの寿命に合わせることで、両方が解消します。
+**`Thread { ... }` の先頭に sleep を入れた場合**: クラッシュしません。
+`SQLiteOpenHelper.close()` は内部の参照を捨てるだけなので、3 秒後の `dbHelper.readableDatabase` は DB を**開き直し**、
+クエリは成功し、`runOnUiThread` は破棄済みの古い Activity の `adapter` / `summaryText` を黙って更新します
+(新しい Activity には反映されない。古い Activity は Thread に掴まれたままメモリに残る = リーク)。
+
+つまり、生の Thread は「どこで止まっているか」によってクラッシュにもリークにもなり、Activity の寿命を一切知りません。
+これがコメント②の意味です。Step 1 の `lifecycleScope` が「続きの処理」をキャンセルし、Step 2 で DbHelper をアプリの寿命に合わせることで、両方が解消します。

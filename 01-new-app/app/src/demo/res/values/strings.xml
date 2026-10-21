@@ -1,0 +1,4 @@
+<resources>
+    <!-- demo flavor だけ、失敗が疑似であることを文言に出す(flavor ごとのリソース上書きの例) -->
+    <string name="notes_refresh_failed">同期に失敗しました（疑似ネットワークエラー: 3 回に 1 回失敗します）。もう一度お試しください。</string>
+</resources>

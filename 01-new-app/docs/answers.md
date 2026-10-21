@@ -15,15 +15,27 @@ class GetNotesUseCase @Inject constructor(private val notesRepository: NotesRepo
     operator fun invoke(query: String = "", sortOrder: SortOrder = SortOrder.UPDATED_DESC): Flow<List<Note>> {
         val normalized = query.trim()
         return notesRepository.observeNotes().map { notes ->
-            val filtered = if (normalized.isEmpty()) notes else notes.filter { it.matches(normalized) }
+            val filtered = if (normalized.isEmpty()) {
+                notes
+            } else {
+                notes.filter { note ->
+                    note.title.contains(normalized, ignoreCase = true) ||
+                        note.body.contains(normalized, ignoreCase = true)
+                }
+            }
             when (sortOrder) {
-                SortOrder.UPDATED_DESC -> filtered.sortedByDescending { it.updatedAt }
+                // 更新順は Repository(DAO の SQL)がすでに保証している。ここで並べ直すと
+                // 「並び順は DAO が決める」という既存のテストの前提(Fake は渡した順を返す)が崩れる
+                SortOrder.UPDATED_DESC -> filtered
                 SortOrder.TITLE_ASC -> filtered.sortedBy { it.title }
             }
         }
     }
 }
 ```
+
+`UPDATED_DESC` で並べ直さないのは手抜きではありません。並び順の責任を 2 か所(DAO と UseCase)に持たせると、
+どちらが正か分からなくなります。「既定の並びは DAO、それ以外の並びは UseCase」と責任を分けています。
 
 ```kotlin
 // ui/notes/NotesViewModel.kt
@@ -152,11 +164,13 @@ UI は `NoteRow` に `IconButton(onClick = { onTogglePin(note.id) }) { Icon(if (
 
 ## 3 同期失敗時に「再試行」できる Snackbar
 
+`strings.xml` に `<string name="notes_retry">再試行</string>` を追加したうえで:
+
 ```kotlin
 // NotesScreen.kt(状態なし版)
 fun NotesScreen(
     ...,
-    onRetry: () -> Unit,     // 追加
+    onRetry: () -> Unit,     // 追加(2 つの Preview にも onRetry = {} を足す)
 ) {
     ...
     val userMessage = uiState.userMessageRes?.let { stringResource(it) }
@@ -245,10 +259,18 @@ Retrofit に差し替えた瞬間に初めて起きるクラッシュです。
 
 ## 6 Hilt のテストで RemoteModule を差し替える(概略)
 
+```toml
+# gradle/libs.versions.toml に追加
+hilt-android-testing = { group = "com.google.dagger", name = "hilt-android-testing", version.ref = "hilt" }
+androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }       # BOM が版を決める
+androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+```
+
 ```kotlin
 // build.gradle.kts
-androidTestImplementation(libs.hilt.android.testing)   // com.google.dagger:hilt-android-testing
+androidTestImplementation(libs.hilt.android.testing)
 kspAndroidTest(libs.hilt.compiler)
+androidTestImplementation(platform(libs.androidx.compose.bom))
 androidTestImplementation(libs.androidx.ui.test.junit4)
 debugImplementation(libs.androidx.ui.test.manifest)
 // defaultConfig.testInstrumentationRunner = "com.example.archnotes.HiltTestRunner"

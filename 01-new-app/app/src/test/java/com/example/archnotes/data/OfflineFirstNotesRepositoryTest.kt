@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -52,6 +53,17 @@ class OfflineFirstNotesRepositoryTest {
 
         assertEquals(1, dao.currentRows.size)
         assertEquals("先", dao.currentRows.single().title) // distinctBy は最初の 1 件を採用する
+    }
+
+    @Test
+    fun `サーバーが更新日時を返さなければ取り込み時刻で補う`() = runTest {
+        val before = System.currentTimeMillis()
+        remoteNotes = listOf(NetworkNote(id = 1, title = "no date", body = ""))
+
+        repository.refresh()
+
+        val updatedAt = dao.currentRows.single().updatedAt
+        assertTrue(updatedAt >= before && updatedAt <= System.currentTimeMillis())
     }
 
     @Test

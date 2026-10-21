@@ -40,10 +40,10 @@ ViewModel と `TodoViewModelTest` は 4-1 のまま。Preview には `onHideDone
 
 | | Step 0 | Step 2 | Step 3 | Step 5 |
 |---|---|---|---|---|
-| 変更ファイル | 2 | 3 | 3 | 1(UI のみ。VM は 4-1 で済み) |
+| 変更ファイル | 2 | 3 | 3 | 1(UI のみ。VM とテストは 4-1 のコピー) |
 | 状態の置き場 | Activity のリスト × 2 | UiState(`hideDone`) | `MutableStateFlow` + combine | 同左 |
 | フィルタの同期 | 手動 `applyFilter()` | `render` が走る | `combine` が走る | 再コンポーズ |
-| 回転対策 | 自前 `onSaveInstanceState` | 不要 | 不要 | 不要 |
+| 回転対策 | View の自動復元とロード完了の順序を自分で追う | 不要 | 不要 | 不要 |
 | テスト | 不可 | 可(書いていない) | 可(書いていない) | 4-1 のテストがそのまま通る |
 | UI 側の変更 | リスト 2 本の管理 | `submit(visibleTodos)` + CheckBox 同期 | 同左 | `items(visibleTodos)` + Switch |
 
@@ -53,42 +53,40 @@ Step 0 → 2 で「状態の置き場」が変わり、2 → 3 で「更新の�
 ## 5-2 Preview を 3 状態分つくる
 
 ```kotlin
-private val previewCallbacks = object {
-    val onAdd: (String) -> Unit = {}
-    val onDoneChange: (Long, Boolean) -> Unit = { _, _ -> }
-    val onDelete: (Long) -> Unit = {}
-    val onErrorShown: () -> Unit = {}
+/** Preview 用に、コールバックを空にした状態なし版を包む */
+@Composable
+private fun PreviewTodoScreen(uiState: TodoUiState) {
+    MaterialTheme {
+        TodoScreen(
+            uiState = uiState,
+            onAdd = {},
+            onDoneChange = { _, _ -> },
+            onDelete = {},
+            onErrorShown = {},
+        )
+    }
 }
 
 @Preview(showBackground = true, name = "読み込み中")
 @Composable
-private fun TodoScreenLoadingPreview() {
-    MaterialTheme { TodoScreen(uiState = TodoUiState(isLoading = true), /* callbacks */) }
-}
+private fun TodoScreenLoadingPreview() = PreviewTodoScreen(TodoUiState(isLoading = true))
 
 @Preview(showBackground = true, name = "空")
 @Composable
-private fun TodoScreenEmptyPreview() {
-    MaterialTheme { TodoScreen(uiState = TodoUiState(isLoading = false), /* callbacks */) }
-}
+private fun TodoScreenEmptyPreview() = PreviewTodoScreen(TodoUiState(isLoading = false))
 
 @Preview(showBackground = true, name = "3 件(1 件完了)")
 @Composable
-private fun TodoScreenListPreview() {
-    MaterialTheme {
-        TodoScreen(
-            uiState = TodoUiState(
-                isLoading = false,
-                todos = listOf(
-                    Todo(1, "牛乳を買う", isDone = true, createdAt = 0),
-                    Todo(2, "本を読む", isDone = false, createdAt = 0),
-                    Todo(3, "散歩", isDone = false, createdAt = 0),
-                ),
-            ),
-            /* callbacks */
-        )
-    }
-}
+private fun TodoScreenListPreview() = PreviewTodoScreen(
+    TodoUiState(
+        isLoading = false,
+        todos = listOf(
+            Todo(1, "牛乳を買う", isDone = true, createdAt = 0),
+            Todo(2, "本を読む", isDone = false, createdAt = 0),
+            Todo(3, "散歩", isDone = false, createdAt = 0),
+        ),
+    ),
+)
 ```
 
 状態あり版 `TodoScreen(viewModel)` には Preview を付けられません(Hilt と Room が必要になる)。
@@ -96,7 +94,8 @@ private fun TodoScreenListPreview() {
 
 ## 5-3 入力中のテキストを ViewModel に移すべきか(発展)
 
-ViewModel に移した版:
+ViewModel に移した版(`savedStateHandle.saveable` は `androidx.lifecycle:lifecycle-viewmodel-compose` にあるので、
+`libs.versions.toml` に `androidx-lifecycle-viewmodel-compose` を追加し、step5 の依存に足す。01-new-app の catalog に同じ行がある):
 
 ```kotlin
 @OptIn(SavedStateHandleSaveableApi::class)

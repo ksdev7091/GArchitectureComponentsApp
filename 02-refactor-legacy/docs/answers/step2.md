@@ -44,7 +44,7 @@ private fun render(state: TodoUiState) {
 |---|---|---|
 | 状態の置き場 | Activity に `todos` と `visibleTodos` の 2 つ | UiState に `hideDone` 1 つ。表示用は計算 |
 | フィルタの同期 | `applyFilter()` を手で呼ぶ | 不要(UiState が変われば `render` が走る) |
-| 回転対策 | `onSaveInstanceState` を自前実装 | 不要(ViewModel が生き残る) |
+| 回転対策 | CheckBox の自動復元と `loadTodos()` 完了の順序を自分で追う | 不要(ViewModel が生き残り、`render` が状態を映す) |
 | テスト | 不可 | `TodoUiState(todos, hideDone = true).visibleTodos` を JVM で検証できる |
 
 注意点: `render()` で `hideDoneCheck.isChecked = state.hideDone` を設定するとリスナーが発火し、
