@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -112,6 +113,9 @@ fun NoteEditorScreen(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
+                // edge-to-edge ではキーボード(IME)のインセットもアプリが扱う。
+                // これが無いと本文欄がキーボードの下まで伸び、長文の末尾が隠れる(実機で確認)
+                .imePadding()
                 .padding(16.dp),
         ) {
             OutlinedTextField(
