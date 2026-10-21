@@ -18,6 +18,8 @@ Todo アプリ(追加・完了・削除・「n 件中 m 件完了」の集計)�
 | `step5-compose` | Compose 化 | (UI の刷新。ViewModel は無変更) | XML + Adapter → `TodoScreen` | [docs/step5.md](docs/step5.md) |
 
 最初に [docs/00-how-to-refactor.md](docs/00-how-to-refactor.md) で「どの順番で、なぜその順番で直すか」を読んでください。
+各ステップを読み終えたら [docs/exercises.md](docs/exercises.md) の演習に取り組んでください(解答例は [docs/answers/](docs/answers/))。
+同じ機能(「完了済みを隠す」)を Step 0 / 2 / 3 / 5 で実装して変更箇所を比べるのが中心課題です。
 
 ## 進め方
 

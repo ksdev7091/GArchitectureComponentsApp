@@ -28,6 +28,23 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
+
+    // リモートデータソースの実装を flavor で切り替える(公式サンプル Now in Android と同じ方式)。
+    // - demo: ネットワークに出ない疑似リモート(FakeNoteRemoteDataSource)。学習・UI 確認用
+    // - prod: Retrofit で公開 API(JSONPlaceholder)に接続する本物のリモート
+    // どちらを使うかは src/demo と src/prod にある RemoteModule(Hilt)が決める。
+    flavorDimensions += "environment"
+    productFlavors {
+        create("demo") {
+            dimension = "environment"
+            applicationIdSuffix = ".demo"
+            buildConfigField("String", "API_BASE_URL", "\"http://localhost/\"") // demo では使わない
+        }
+        create("prod") {
+            dimension = "environment"
+            buildConfigField("String", "API_BASE_URL", "\"https://jsonplaceholder.typicode.com/\"")
+        }
+    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
@@ -39,6 +56,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true // flavor ごとの API_BASE_URL を BuildConfig に出す
     }
 }
 
@@ -60,6 +78,12 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     ksp(libs.androidx.room.compiler)
 
+    // --- Data層: ネットワーク(Retrofit + OkHttp + kotlinx.serialization) ---
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.kotlinx.serialization)
+    implementation(libs.okhttp)
+    implementation(libs.okhttp.logging.interceptor)
+
     // --- 非同期: Coroutines ---
     implementation(libs.kotlinx.coroutines.android)
 
@@ -71,6 +95,7 @@ dependencies {
     // --- テスト ---
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.okhttp.mockwebserver) // Retrofit 実装を本物の HTTP で検証する
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.kotlinx.coroutines.test)

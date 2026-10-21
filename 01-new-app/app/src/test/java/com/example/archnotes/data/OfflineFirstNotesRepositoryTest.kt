@@ -29,23 +29,23 @@ class OfflineFirstNotesRepositoryTest {
 
     @Test
     fun `同期するとサーバーのメモが取り込まれ、再同期しても重複しない`() = runTest {
-        remoteNotes = listOf(NetworkNote(id = "srv-1", title = "v1", body = "", updatedAt = 10))
+        remoteNotes = listOf(NetworkNote(id = 1, title = "v1", body = "", updatedAt = 10))
 
         repository.refresh()
-        remoteNotes = listOf(NetworkNote(id = "srv-1", title = "v2", body = "", updatedAt = 20))
+        remoteNotes = listOf(NetworkNote(id = 1, title = "v2", body = "", updatedAt = 20))
         repository.refresh()
 
         val notes = repository.observeNotes().first()
         assertEquals(1, notes.size)
         assertEquals("v2", notes.single().title) // 同じ remoteId の行が更新された
-        assertEquals("srv-1", dao.currentRows.single().remoteId)
+        assertEquals("1", dao.currentRows.single().remoteId)
     }
 
     @Test
     fun `応答に同じサーバー ID が重複していても 1 件として取り込む`() = runTest {
         remoteNotes = listOf(
-            NetworkNote(id = "srv-1", title = "先", body = "", updatedAt = 10),
-            NetworkNote(id = "srv-1", title = "後", body = "", updatedAt = 20),
+            NetworkNote(id = 1, title = "先", body = "", updatedAt = 10),
+            NetworkNote(id = 1, title = "後", body = "", updatedAt = 20),
         )
 
         repository.refresh()
@@ -57,7 +57,7 @@ class OfflineFirstNotesRepositoryTest {
     @Test
     fun `同期はローカルで作ったメモに影響しない`() = runTest {
         val localId = repository.saveNote(Note(id = Note.NEW_NOTE_ID, title = "ローカル", body = "", updatedAt = 5))
-        remoteNotes = listOf(NetworkNote(id = "srv-1", title = "サーバー", body = "", updatedAt = 10))
+        remoteNotes = listOf(NetworkNote(id = 1, title = "サーバー", body = "", updatedAt = 10))
 
         repository.refresh()
 
@@ -80,7 +80,7 @@ class OfflineFirstNotesRepositoryTest {
 
     @Test
     fun `サーバー由来のメモを編集しても remoteId は保たれる`() = runTest {
-        remoteNotes = listOf(NetworkNote(id = "srv-1", title = "元", body = "", updatedAt = 10))
+        remoteNotes = listOf(NetworkNote(id = 1, title = "元", body = "", updatedAt = 10))
         repository.refresh()
         val note = repository.observeNotes().first().single()
 
@@ -88,7 +88,7 @@ class OfflineFirstNotesRepositoryTest {
 
         val row = dao.currentRows.single()
         assertEquals("編集後", row.title)
-        assertEquals("srv-1", row.remoteId) // Note は remoteId を持たないが、Repository が引き継ぐ
+        assertEquals("1", row.remoteId) // Note は remoteId を持たないが、Repository が引き継ぐ
     }
 
     @Test

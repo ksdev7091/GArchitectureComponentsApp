@@ -59,14 +59,16 @@ class OfflineFirstNotesRepository @Inject constructor(
 
     override suspend fun refresh() {
         val remoteNotes = remoteDataSource.fetchNotes()
+        val importedAt = System.currentTimeMillis()
         val entities = remoteNotes
             .distinctBy { it.id } // 応答に同じ ID が 2 回あっても 1 件として扱う
             .map { network ->
                 NoteEntity(
-                    remoteId = network.id,
+                    remoteId = network.id.toString(),
                     title = network.title,
                     body = network.body,
-                    updatedAt = network.updatedAt,
+                    // サーバーが更新日時を返さない場合は「取り込んだ時刻」を更新日時とする
+                    updatedAt = network.updatedAt ?: importedAt,
                 )
             }
         // サーバー ID でローカル行と照合しながら書き込む(DAO 側で 1 トランザクションにまとめている)
