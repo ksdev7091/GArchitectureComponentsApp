@@ -46,6 +46,9 @@ data class NoteEditorUiState(
  *    プロセス再生成後に再ロードすると、ユーザーの編集内容を上書きしてしまうため、
  *    「ロード済み」フラグも SavedStateHandle に残す。
  * 4. **二重保存の防止**: 保存ボタンの連打で同じメモが 2 つできないよう、保存中フラグで弾く。
+ *
+ * テキストはスナップショット状態、それ以外は StateFlow と、2 種類の状態が同居している。
+ * 両方から導く「保存できるか」は画面側で計算する(理由は [canSaveNow] のコメント)。
  */
 @OptIn(SavedStateHandleSaveableApi::class)
 @HiltViewModel
@@ -90,9 +93,15 @@ class NoteEditorViewModel @Inject constructor(
             initialValue = NoteEditorUiState(isNew = isNew, isLoading = isLoading.value),
         )
 
-    /** 保存できるか。導出できる値なので別の状態として持たず、元の状態から計算する。 */
-    val canSave: Boolean
-        get() = title.isNotBlank() && !isLoading.value && !isSaving.value && !isSaved.value
+    /**
+     * 保存できるか。[title](スナップショット状態)と [uiState](StateFlow)の両方から導く値なので、
+     * 両方を購読している画面側で同じ式を計算する(NoteEditorScreen の状態あり版)。
+     * ViewModel 側はイベントの入口で「今」の値を見て弾くだけに使う。
+     * Compose が追跡するのはスナップショット状態だけで、StateFlow の `.value` を Composable から
+     * 直接読んでも再コンポーズの対象にならない。両方が混ざる導出値を公開プロパティにしない。
+     */
+    private fun canSaveNow(): Boolean =
+        title.isNotBlank() && !isLoading.value && !isSaving.value && !isSaved.value
 
     init {
         if (isLoading.value) {
@@ -123,8 +132,9 @@ class NoteEditorViewModel @Inject constructor(
     }
 
     fun save() {
-        if (!canSave) return
-        // launch の中で立てると、連打の 2 回目が先に通ることがあるので同期的に立てる
+        if (!canSaveNow()) return
+        // 保存中フラグは launch の外で同期的に立てる。ディスパッチャの都合に依存せず、
+        // 連打の 2 回目が必ず弾かれることをコードの形で保証するため
         isSaving.value = true
         viewModelScope.launch {
             try {

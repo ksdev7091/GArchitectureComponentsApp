@@ -41,7 +41,11 @@ class NoteEditorViewModelTest {
         assertTrue(state.isNew)
         assertFalse(state.isLoading)
         assertEquals("", viewModel.title)
-        assertFalse(viewModel.canSave)
+
+        viewModel.save() // タイトルが空なので何も起きない
+
+        assertFalse(viewModel.uiState.value.isSaved)
+        assertTrue(repository.currentNotes.isEmpty())
     }
 
     @Test
@@ -81,7 +85,6 @@ class NoteEditorViewModelTest {
 
         viewModel.onTitleChange("  新しいメモ  ")
         viewModel.onBodyChange("内容")
-        assertTrue(viewModel.canSave)
 
         viewModel.save()
 
@@ -116,7 +119,6 @@ class NoteEditorViewModelTest {
 
         viewModel.save() // 1 回目: saveGate で待たされる
         assertTrue(viewModel.uiState.value.isSaving)
-        assertFalse(viewModel.canSave)
         viewModel.save() // 2 回目: 保存中なので無視される
 
         repository.saveGate!!.complete(Unit)

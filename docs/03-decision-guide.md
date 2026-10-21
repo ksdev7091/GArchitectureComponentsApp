@@ -74,7 +74,8 @@ Channel は UI が処理できない状態(バックグラウンドなど)のと
 
 **推奨**: イベントも状態にする。「メッセージを表示すべき」「保存が完了した」というフラグを UiState に持ち、UI が受け取ったら ViewModel に消してもらう。
 UI 側は「受け取った」と伝えてから表示を始める(表示が終わるまで待つと、その間の回転で再表示されたり、同じメッセージの再発生を取りこぼしたりする)。
-同じメッセージが連続して出るのを厳密に扱うなら、公式ガイドのように ID 付きメッセージのリストにする。
+このやり方にもトレードオフはある: 表示中に回転すると Snackbar は消えて再表示されない(受け取り済みなので)。
+公式ガイドの「ID 付きメッセージのリスト」方式なら、表示し終えるまで状態に残しつつ同じ内容の連続発生も区別できる。本書は簡潔さを優先して受け取り時に消す方式にしている。
 → `NotesViewModel.userMessageShown()`, `NoteEditorUiState.isSaved`, [NotesScreen](../01-new-app/app/src/main/java/com/example/archnotes/ui/notes/NotesScreen.kt) の `LaunchedEffect`
 
 ## Q7. StateFlow か LiveData か

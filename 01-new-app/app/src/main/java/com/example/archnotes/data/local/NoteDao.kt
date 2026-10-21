@@ -2,6 +2,7 @@ package com.example.archnotes.data.local
 
 import androidx.room.Dao
 import androidx.room.Query
+import androidx.room.Transaction
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
@@ -35,9 +36,23 @@ interface NoteDao {
     @Upsert
     suspend fun upsert(note: NoteEntity): Long
 
-    @Upsert
-    suspend fun upsertAll(notes: List<NoteEntity>)
-
     @Query("DELETE FROM notes WHERE id = :id")
     suspend fun deleteById(id: Long)
+
+    /**
+     * サーバー由来のメモをまとめて取り込む。
+     * 各メモの remoteId でローカル行を探し、あればその行を更新、なければ新規行として挿入する。
+     *
+     * `@Transaction` で全体を 1 つのトランザクションにしているので、
+     * 取り込みの途中で別の書き込みが割り込んで照合結果が古くなることがない。
+     * remote_id の UNIQUE インデックスは「万一重複したときの最後の安全網」で、照合の仕組みそのものではない。
+     * (Kotlin インターフェースの default メソッドに @Transaction を付ける書き方は Room がサポートしている)
+     */
+    @Transaction
+    suspend fun syncFromRemote(notes: List<NoteEntity>) {
+        for (note in notes) {
+            val local = note.remoteId?.let { getByRemoteId(it) }
+            upsert(note.copy(id = local?.id ?: 0))
+        }
+    }
 }

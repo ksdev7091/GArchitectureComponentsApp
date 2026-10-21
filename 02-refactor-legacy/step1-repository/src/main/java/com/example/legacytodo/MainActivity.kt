@@ -25,7 +25,8 @@ import kotlinx.coroutines.launch
  * - DB アクセスのコードが Activity から消え、[TodoRepository] を呼ぶだけになった(①の一部を解決)
  * - `Thread` + `runOnUiThread` が `lifecycleScope.launch` + suspend 関数になった(②を解決)
  *   lifecycleScope は Activity の destroy 時に自動でキャンセルされるので、
- *   destroy 後の Activity を掴んだまま処理が走り続けることがなくなった。
+ *   destroy 後に古い Activity の画面を更新しようとする「続きの処理」が走らなくなった
+ *   (実行中の DB アクセスそのものは完了まで動く)。
  *
  * まだ残っている問題:
  * - ① Adapter はまだ Activity の inner class で、Activity のフィールドを直接触っている。

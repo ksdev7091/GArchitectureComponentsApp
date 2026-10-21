@@ -59,17 +59,17 @@ class OfflineFirstNotesRepository @Inject constructor(
 
     override suspend fun refresh() {
         val remoteNotes = remoteDataSource.fetchNotes()
-        val entities = remoteNotes.map { network ->
-            // サーバー ID でローカルの行を探し、あればその行を更新、なければ新規行として挿入する
-            val local = noteDao.getByRemoteId(network.id)
-            NoteEntity(
-                id = local?.id ?: 0,
-                remoteId = network.id,
-                title = network.title,
-                body = network.body,
-                updatedAt = network.updatedAt,
-            )
-        }
-        noteDao.upsertAll(entities)
+        val entities = remoteNotes
+            .distinctBy { it.id } // 応答に同じ ID が 2 回あっても 1 件として扱う
+            .map { network ->
+                NoteEntity(
+                    remoteId = network.id,
+                    title = network.title,
+                    body = network.body,
+                    updatedAt = network.updatedAt,
+                )
+            }
+        // サーバー ID でローカル行と照合しながら書き込む(DAO 側で 1 トランザクションにまとめている)
+        noteDao.syncFromRemote(entities)
     }
 }

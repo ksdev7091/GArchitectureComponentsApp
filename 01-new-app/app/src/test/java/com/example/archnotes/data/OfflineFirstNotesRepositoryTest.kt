@@ -42,6 +42,18 @@ class OfflineFirstNotesRepositoryTest {
     }
 
     @Test
+    fun `応答に同じサーバー ID が重複していても 1 件として取り込む`() = runTest {
+        remoteNotes = listOf(
+            NetworkNote(id = "srv-1", title = "先", body = "", updatedAt = 10),
+            NetworkNote(id = "srv-1", title = "後", body = "", updatedAt = 20),
+        )
+
+        repository.refresh()
+
+        assertEquals(1, dao.currentRows.size)
+    }
+
+    @Test
     fun `同期はローカルで作ったメモに影響しない`() = runTest {
         val localId = repository.saveNote(Note(id = Note.NEW_NOTE_ID, title = "ローカル", body = "", updatedAt = 5))
         remoteNotes = listOf(NetworkNote(id = "srv-1", title = "サーバー", body = "", updatedAt = 10))

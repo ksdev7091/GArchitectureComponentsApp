@@ -96,8 +96,8 @@ class NotesViewModel @Inject constructor(
 
     fun refresh() {
         if (isRefreshing.value) return
+        isRefreshing.value = true // launch の外で同期的に立て、連打の 2 回目を確実に弾く
         viewModelScope.launch {
-            isRefreshing.value = true
             try {
                 notesRepository.refresh()
             } catch (e: IOException) {
@@ -118,7 +118,7 @@ class NotesViewModel @Inject constructor(
         }
     }
 
-    /** UI がメッセージを表示し終えたら呼ぶ。同じメッセージを二度出さないため。 */
+    /** UI がメッセージを受け取ったら(表示を始める前に)呼ぶ。同じメッセージを二度出さないため。 */
     fun userMessageShown() {
         userMessageRes.value = null
     }

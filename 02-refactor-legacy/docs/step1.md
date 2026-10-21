@@ -54,7 +54,8 @@ Step 0 の「destroy 後に古い Activity の画面を更新しようとする�
 ### DbHelper の寿命はまだ Activity が管理している
 
 `TodoDbHelper` は Activity ごとに作られ、`onDestroy` で `close()` しています。Step 0 と同じく、
-close と実行中の DB アクセスが競合する可能性は残っています。
+close と実行中の DB アクセスが競合する可能性は残っています(`close()` の直後に別スレッドが DB を触ると
+`IllegalStateException` でクラッシュしうる。窓はごく短いが、ゼロではない)。
 Step 2 で Repository をアプリ全体で 1 つにすると、DbHelper もアプリの寿命と一致し、この問題は消えます。
 
 ### インターフェースにした理由

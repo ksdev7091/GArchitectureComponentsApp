@@ -12,10 +12,13 @@ data class NoteEditorRoute(val noteId: Long = Note.NEW_NOTE_ID)
 
 /**
  * 編集画面へ遷移する。
- * `launchSingleTop` は、行の連打で編集画面が 2 枚積まれるのを防ぐ。
+ *
+ * 連打対策はここではなく、遷移元の画面(NotesNavigation.kt)で「自分が RESUMED のときだけ遷移する」
+ * と判定している。`launchSingleTop` は同じ引数の重複しか防げず、引数が違う場合は
+ * 既存のエントリ(と ViewModel)を残したまま引数だけ差し替えてしまうため、ここでは使わない。
  */
 fun NavController.navigateToNoteEditor(noteId: Long = Note.NEW_NOTE_ID) {
-    navigate(NoteEditorRoute(noteId)) { launchSingleTop = true }
+    navigate(NoteEditorRoute(noteId))
 }
 
 /** 編集画面を NavGraph に登録する。 */

@@ -42,11 +42,15 @@ fun NoteEditorScreen(
         if (uiState.isSaved) onDone()
     }
 
+    // テキスト(スナップショット状態)と uiState(StateFlow)の両方をここで読んでいるので、
+    // どちらが変わってもこの関数が再コンポーズされ、canSave も計算し直される
+    val canSave = viewModel.title.isNotBlank() &&
+        !uiState.isLoading && !uiState.isSaving && !uiState.isSaved
+
     NoteEditorScreen(
-        // テキストはスナップショット状態なので、読むだけで変更が再コンポーズに反映される
         title = viewModel.title,
         body = viewModel.body,
-        canSave = viewModel.canSave,
+        canSave = canSave,
         uiState = uiState,
         onTitleChange = viewModel::onTitleChange,
         onBodyChange = viewModel::onBodyChange,

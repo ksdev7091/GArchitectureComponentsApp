@@ -73,7 +73,7 @@ class MainActivity : AppCompatActivity() {
 
         state.errorMessageRes?.let { messageRes ->
             Toast.makeText(this, messageRes, Toast.LENGTH_SHORT).show()
-            viewModel.errorMessageShown() // 表示し終えたことを伝え、二重表示を防ぐ
+            viewModel.errorMessageShown() // 受け取ったことを伝えて状態を消し、二重表示を防ぐ
         }
     }
 }

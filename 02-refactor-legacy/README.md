@@ -32,7 +32,8 @@ Todo アプリ(追加・完了・削除・「n 件中 m 件完了」の集計)�
 ## 各ステップで変わるファイル / 変わらないファイル
 
 「=」は前ステップのファイルを **コメントも含めてそのままコピー** したもので、Compare Files で差分ゼロになります
-(解説コメントは、そのファイルを導入・変更したステップの時点のものが残ります)。`strings.xml` だけはアプリ名が各ステップで違います。
+(解説コメントは、そのファイルを導入・変更したステップの時点のものが残ります)。
+表にないファイルのうち `strings.xml` はアプリ名が各ステップで違い(Step 2 で `loading` も追加)、`AndroidManifest.xml` は Step 2 で Application クラスが、`themes.xml` は Step 5 でテーマが変わります。
 
 ```
                  step0  step1  step2  step3  step4  step5
@@ -50,7 +51,7 @@ TodoScreen (Compose)                                   ●
 src/test                                       ●      =
 ```
 
-「= 」の多さが、層を分けたことの見返りです。
+「=」の多さが、層を分けたことの見返りです。
 Step 3 で DB を Room に変えても MainActivity は無変更、Step 5 で UI を Compose に変えても ViewModel とテストは無変更です。
 
 ## 単体テスト

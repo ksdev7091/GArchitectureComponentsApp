@@ -33,7 +33,7 @@ step0-legacy/src/main/java/com/example/legacytodo/
 
 - 「完了済みを非表示にするフィルタを足したい」→ `loadTodos()` の SQL を変える? `todos` を絞る? `updateSummary()` の集計はフィルタ前の件数? フィルタ後? 全部 Activity の中なので、影響範囲が読めない。
 - 「サーバーと同期したい」→ Activity に `HttpURLConnection` も足す? スレッドがもう 1 本増える。
-- 「タブレット用に 2 ペインにしたい」→ Fragment に分けようとすると、`todos` と DB アクセスを両方のFragment が必要とし、同じコードが 2 か所に。
+- 「タブレット用に 2 ペインにしたい」→ Fragment に分けようとすると、`todos` と DB アクセスを両方の Fragment が必要とし、同じコードが 2 か所に。
 - 「集計ロジックが間違っていた」→ 直したあと正しいことをどう確かめる? エミュレータで手動で数える。
 
 アーキテクチャは「今日動くか」ではなく「明日変えられるか」のためにあります。

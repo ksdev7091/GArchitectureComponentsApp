@@ -32,12 +32,12 @@ app/src/main/java/com/example/archnotes/
 │   └── GetNotesUseCase.kt        検索語でフィルタする
 └── data/                         ── Data 層 ──
     ├── NotesRepository.kt        公開 API(インターフェース)
-    ├── OfflineFirstNotesRepository.kt   Room を SSOT とする実装。サーバー ID でローカル行を照合
-    ├── local/                    Room: NoteEntity(id と remoteId), NoteDao, NotesDatabase
+    ├── OfflineFirstNotesRepository.kt   Room を SSOT とする実装
+    ├── local/                    Room: NoteEntity(id と remoteId), NoteDao(remoteId 照合の同期は @Transaction), NotesDatabase
     ├── remote/                   NoteRemoteDataSource(抽象、失敗は IOException)と Fake 実装
     └── di/                       Hilt モジュール: 何をどう組み立てるか
 
-app/src/test/        JVM 単体テスト 19 件(ViewModel × 2, UseCase, Repository)と Fake / テストルール
+app/src/test/        JVM 単体テスト 20 件(ViewModel × 2, UseCase, Repository)と Fake / テストルール
 app/src/androidTest/ Room DAO の Instrumented Test
 ```
 
@@ -51,15 +51,18 @@ UI 層が Data 層を直接使うのは許されています(`NotesViewModel` �
 1. `model/Note.kt` — 2 分。これが何を表すかを把握する。
 2. `data/NotesRepository.kt` — インターフェースのコメントを読む。「読み取りは Flow、書き込みは suspend」の理由。
 3. `data/OfflineFirstNotesRepository.kt` — SSOT とオフラインファースト。`refresh()` がサーバーの応答を UI に返さず Room に書く点、
-   サーバー ID(`remoteId`)でローカル行を照合する点、`withContext` が不要な理由に注目。
+   `saveNote` が `@Upsert` の戻り値の癖と `remoteId` の引き継ぎを吸収している点、`withContext` が不要な理由に注目。
 4. `data/local/` と `data/remote/` — Entity / DTO / モデルを分ける理由。ローカル ID とサーバー ID を別カラムに持つ理由。
+   `NoteDao.syncFromRemote` がサーバー ID で照合しながら 1 トランザクションで書く理由。
    DataSource が「失敗は IOException」という契約を持つ理由。
 5. `domain/GetNotesUseCase.kt` — Domain 層の形と、置く/置かないの判断。
 6. `ui/notes/NotesViewModel.kt` — 複数の StateFlow を `combine` して 1 つの UiState にする。例外を状態に変換する。
 7. `ui/notes/NotesScreen.kt` — 状態あり版と状態なし版。「一度きりの通知」の扱い(受け取ったらすぐ消してもらう)。
 8. `ui/editor/NoteEditorViewModel.kt` — 画面引数、入力テキストをスナップショット状態 + `savedStateHandle.saveable` で持つ理由、
    プロセス再生成後にユーザーの編集を上書きしない工夫、保存ボタン連打の防止。
-9. `ui/editor/NoteEditorNavigation.kt` と `ui/ArchNotesNavHost.kt` — ルートを画面側に置く理由。
+   「保存できるか」をスナップショット状態と StateFlow の両方から導く値として画面側で計算している理由。
+9. `ui/notes/NotesNavigation.kt`、`ui/editor/NoteEditorNavigation.kt`、`ui/ArchNotesNavHost.kt` — ルートを画面側に置く理由。
+   行の連打で画面が 2 枚積まれないよう、遷移元が RESUMED のときだけ遷移する仕組み。
 10. `data/di/` — Hilt モジュール。Fake と本物の差し替えが 1 行で済むことを確認。
 11. `src/test/` — ViewModel と Repository が JVM だけでテストできることを確認。
 
@@ -82,7 +85,7 @@ UI が関わるのは 1 と 8 だけ。「何件に絞られるか」を UI は�
 2. `isRefreshing.value = true` → `combine` が走り UiState の `isRefreshing = true` → UI に `LinearProgressIndicator` が出る
 3. `notesRepository.refresh()` → `FakeNoteRemoteDataSource.fetchNotes()` が 1.2 秒待って 3 件返す(3 回に 1 回 `IOException`)。
    Room も DataSource も main-safe なので、Repository は `withContext` を書いていない
-4. 成功: 各メモのサーバー ID でローカル行を探し(`getByRemoteId`)、あればその行、なければ新規行として `upsertAll`
+4. 成功: `NoteDao.syncFromRemote` が 1 トランザクションの中で各メモのサーバー ID でローカル行を探し、あればその行、なければ新規行として `upsert`
    → Room の `observeAll()` Flow が新しいリストを流す → 検索の流れの 6〜8 と同じ経路で UI が更新される。
    **ViewModel は Room の結果を受け取っていない**ことに注目。書いたら勝手に流れてくる。
 5. 失敗: ViewModel が `IOException` を catch → `userMessageRes.value = R.string.notes_refresh_failed` → UiState

@@ -36,13 +36,12 @@ class FakeNoteDao : NoteDao {
     override suspend fun upsert(note: NoteEntity): Long {
         val isInsert = note.id == 0L
         val stored = if (isInsert) note.copy(id = nextId++) else note
+        nextId = maxOf(nextId, stored.id + 1) // 明示的な id で挿入されても採番が衝突しないように
         rows.update { list -> list.filterNot { it.id == stored.id } + stored }
         return if (isInsert) stored.id else -1L
     }
 
-    override suspend fun upsertAll(notes: List<NoteEntity>) {
-        notes.forEach { upsert(it) }
-    }
+    // syncFromRemote は NoteDao の default メソッドなので、この Fake の getByRemoteId / upsert を使って動く
 
     override suspend fun deleteById(id: Long) {
         rows.update { list -> list.filterNot { it.id == id } }
