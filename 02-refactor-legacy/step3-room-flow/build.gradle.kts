@@ -42,6 +42,5 @@ dependencies {
     implementation(libs.androidx.activity.ktx)
     // Step 3 で追加: SQLiteOpenHelper → Room
     implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 }

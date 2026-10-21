@@ -4,6 +4,10 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
+/**
+ * Step 0 からそのまま `data` パッケージへ移動。中身は変えていない。
+ * リファクタリングでは「場所を変える」と「中身を変える」を同時にやらないのがコツ。
+ */
 class TodoDbHelper(context: Context) : SQLiteOpenHelper(context, "todo.db", null, 1) {
 
     override fun onCreate(db: SQLiteDatabase) {

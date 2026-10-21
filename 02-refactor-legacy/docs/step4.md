@@ -41,7 +41,10 @@ Step 4 では同じことを 2 つのアノテーションで表現していま�
 Hilt はこれらをたどって、`TodoViewModel` を作るのに必要なものを全部組み立てます。
 手書きの `Factory` が消えたのはそのためです。
 
-**Hilt を入れたから何かができるようになったわけではありません。** Step 1〜3 で「依存をコンストラクタで受け取る」形にしていたから、Hilt が入れられた。順番が逆だと Hilt は導入できません。
+**Hilt を入れたから何かができるようになったわけではありません。** Step 1〜3 で「依存をコンストラクタで受け取る」形にしていたから、Hilt が意味を持った。
+順番が逆でも Hilt 自体は入れられますが、クラスが内部で `new` している依存には注入する余地がなく、何も良くなりません。
+
+これで Step 0 の ⑤(依存を自分で `new` している)が解決し、次のテストで ⑥(テストが書けない)も解決します。
 
 ### テスト: Step 0 では不可能だったこと
 
@@ -50,6 +53,8 @@ Hilt はこれらをたどって、`TodoViewModel` を作るのに必要なも�
 ```kotlin
 val repository = FakeTodoRepository(listOf(todo(1, "a", isDone = true), todo(2, "b")))
 val viewModel = TodoViewModel(repository)
+// WhileSubscribed なので、購読しないと上流(Repository の Flow)が動かない
+backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect() }
 assertEquals(1, viewModel.uiState.value.doneCount)
 ```
 

@@ -50,7 +50,7 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.add_button).setOnClickListener {
             viewModel.addTodo(input.text.toString())
-            input.text.clear()
+            input.text.clear() // 成否を待たずにクリアする(空文字のときは消しても同じ)
         }
 
         // 画面が表示されている間(STARTED 以上)だけ状態を購読する。
@@ -65,7 +65,11 @@ class MainActivity : AppCompatActivity() {
     /** 状態 → 画面。ここには「判断」を書かない。状態をそのまま映すだけ。 */
     private fun render(state: TodoUiState) {
         adapter.submit(state.todos)
-        summaryText.text = getString(R.string.summary_format, state.totalCount, state.doneCount)
+        summaryText.text = if (state.isLoading) {
+            getString(R.string.loading)
+        } else {
+            getString(R.string.summary_format, state.totalCount, state.doneCount)
+        }
 
         state.errorMessageRes?.let { messageRes ->
             Toast.makeText(this, messageRes, Toast.LENGTH_SHORT).show()

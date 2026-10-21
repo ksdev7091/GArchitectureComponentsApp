@@ -8,7 +8,7 @@
 | 置く | 置かない |
 |---|---|
 | 複数画面で同じロジックを使う | ロジックが 1 画面にしか現れない |
-| ViewModel が 300 行を超えてきた | ViewModel が十分小さい |
+| ViewModel が肥大化してきた(目安: 300 行) | ViewModel が十分小さい |
 | ロジック単体でテストしたい | ViewModel のテストで十分カバーできる |
 
 **払うもの**: クラス数が増える。「Repository を呼ぶだけ」の UseCase が量産されると、意味のない層になる。
@@ -26,20 +26,23 @@
 
 | Hilt | 手動 DI (AppContainer) |
 |---|---|
-| 画面が 5 つ以上、依存関係が入り組んでいる | 画面が数個、依存が単純 |
-| チームで作る(組み立てルールを強制したい) | 1 人で作る小さなアプリ |
+| 画面が複数あり、依存関係が入り組んでいる(目安: 5 画面以上) | 画面が数個、依存が単純 |
+| チームで作る(組み立てルールを強制したい) | 1 人で作る小さなアプリ、学習用 |
 | ビルド時間の増加、アノテーションの学習コストを許容できる | ライブラリを増やしたくない |
 
-**判断**: 中規模以上なら Hilt。ただし **Hilt を入れる前に「依存をコンストラクタで受け取る」形にしておく**こと。
+**判断**: 公式は規模を問わず Hilt を推奨しており、手動 DI は学習用・極小アプリ向けの選択肢と考えてよい。
+ただし **Hilt を入れる前に「依存をコンストラクタで受け取る」形にしておく**こと。
 その形になっていれば、手動 DI から Hilt への移行は [Step 3 → Step 4](../02-refactor-legacy/docs/step4.md) のようにほぼ機械的。
-逆にその形になっていなければ、Hilt を入れても何も良くならない。
+逆にその形になっていなくても Hilt 自体は入れられるが、クラスが内部で `new` している依存には注入する余地がなく、何も良くならない。
 
 ## Q4. UI 状態は 1 つの data class か、複数の StateFlow か
 
-公式は **1 つの `UiState` data class を 1 つの `StateFlow` で公開する**ことを推奨。
+公式のガイドは「互いに関連する状態は 1 つの UiState / 1 つのストリームにまとめる。無関係な状態や更新頻度が大きく違う状態は別ストリームにしてもよい」としている。
+本書は **1 画面 1 UiState を基本形** として採用している。
 
 - 利点: 画面の状態が「ある瞬間に 1 つの値」として確定する。状態同士の矛盾(isLoading = true なのに error もある、など)を設計で防げる。
 - 欠点: 一部だけ変わっても全体が再送される(Compose は差分だけ再コンポーズするので通常は問題にならない)。
+- 例外: TextField の入力テキストは UiState に入れず、スナップショット状態で別に持つ(Q7 の後の「入力テキスト」を参照)。
 
 ViewModel の内部では複数の `MutableStateFlow` を持ち、`combine` で 1 つの UiState に合成するのが扱いやすい。
 → [NotesViewModel](../01-new-app/app/src/main/java/com/example/archnotes/ui/notes/NotesViewModel.kt)
@@ -50,8 +53,12 @@ ViewModel の内部では複数の `MutableStateFlow` を持ち、`combine` で 
 // A: フラグ方式
 data class UiState(val items: List<Item>, val isLoading: Boolean, val error: String?)
 
-// B: sealed class 方式
-sealed interface UiState { object Loading; data class Success(val items: List<Item>); data class Error(val message: String) }
+// B: sealed interface 方式(各状態が UiState を実装していることが when の網羅チェックの条件)
+sealed interface UiState {
+    data object Loading : UiState
+    data class Success(val items: List<Item>) : UiState
+    data class Error(val message: String) : UiState
+}
 ```
 
 - A は「読込中だが前回の内容は表示しておく」「エラーだが一覧は出す」のような複合状態を表せる。画面の大半はこちらが自然。
@@ -62,10 +69,13 @@ sealed interface UiState { object Loading; data class Success(val items: List<It
 ## Q6. ViewModel から UI への「イベント」はどう送るか
 
 Snackbar 表示や画面遷移を `SharedFlow` / `Channel` で送る設計は、**公式に非推奨**になった。
-購読していない瞬間のイベントが失われる、または復元後に二重発火するため。
+理由は「配信と処理が保証されない」こと。replay のない SharedFlow は購読していない瞬間のイベントを失い、
+Channel は UI が処理できない状態(バックグラウンドなど)のときに届いてしまい、UI 状態との整合性が取れなくなる。
 
-**推奨**: イベントも状態にする。「メッセージを表示すべき」「保存が完了した」というフラグを UiState に持ち、UI が処理したら ViewModel に消してもらう。
-→ `NotesViewModel.userMessageShown()`, `NoteEditorUiState.isSaved`
+**推奨**: イベントも状態にする。「メッセージを表示すべき」「保存が完了した」というフラグを UiState に持ち、UI が受け取ったら ViewModel に消してもらう。
+UI 側は「受け取った」と伝えてから表示を始める(表示が終わるまで待つと、その間の回転で再表示されたり、同じメッセージの再発生を取りこぼしたりする)。
+同じメッセージが連続して出るのを厳密に扱うなら、公式ガイドのように ID 付きメッセージのリストにする。
+→ `NotesViewModel.userMessageShown()`, `NoteEditorUiState.isSaved`, [NotesScreen](../01-new-app/app/src/main/java/com/example/archnotes/ui/notes/NotesScreen.kt) の `LaunchedEffect`
 
 ## Q7. StateFlow か LiveData か
 
@@ -76,11 +86,16 @@ Snackbar 表示や画面遷移を `SharedFlow` / `Channel` で送る設計は、
 
 既存アプリに LiveData があるなら無理に全部置き換える必要はない。新しく書く部分から StateFlow にしていけばよい。
 
+**入力テキストだけは例外**: TextField に結びつけるテキストは StateFlow ではなく、ViewModel 内のスナップショット状態
+(`var title by savedStateHandle.saveable { mutableStateOf("") }`)にする。
+StateFlow → collect → 再コンポーズという非同期の経路を挟むと、速い入力や日本語の変換中に文字が欠ける・重複することがある。
+→ [NoteEditorViewModel](../01-new-app/app/src/main/java/com/example/archnotes/ui/editor/NoteEditorViewModel.kt)
+
 ## Q8. Repository は `Result` を返すか、例外を投げるか
 
 どちらでも成立する。要点は「UI まで例外を素通しにしない」こと。
 
-- 例外方式(このリポジトリ): Repository は `IOException` を投げ、ViewModel が catch して状態にする。コルーチンのキャンセル(`CancellationException`)を誤って握りつぶさないよう、`catch (e: Exception)` ではなく具体的な型で catch する。
+- 例外方式(このリポジトリ): DataSource が「通信失敗は `IOException`」という契約を守り(Retrofit の `HttpException` などは DataSource 内で変換)、ViewModel がその型を catch して状態にする。コルーチンのキャンセル(`CancellationException`)を誤って握りつぶさないよう、`catch (e: Exception)` ではなく具体的な型で catch する。
 - Result 方式: `Result<T>` や独自の sealed class を返す。呼び出し側が「失敗を扱わない」ことをコンパイル時に防げる。
 
 ## Q9. テストは Fake か Mock か

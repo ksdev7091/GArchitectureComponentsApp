@@ -9,6 +9,14 @@ import android.widget.CheckBox
 import com.example.legacytodo.R
 import com.example.legacytodo.model.Todo
 
+/**
+ * 【Step 2 で分離】Activity の inner class だった Adapter を独立させた。
+ *
+ * Activity のフィールドを直接触るのをやめ、
+ * - 表示するデータは [submit] で外から渡す
+ * - ユーザー操作はコンストラクタで受け取ったコールバックで外へ返す
+ * という「受け取って描く / イベントを返す」だけの部品になった。
+ */
 class TodoAdapter(
     private val onDoneChange: (id: Long, isDone: Boolean) -> Unit,
     private val onDelete: (id: Long) -> Unit,

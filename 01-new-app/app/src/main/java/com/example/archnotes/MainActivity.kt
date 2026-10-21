@@ -4,7 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.example.archnotes.ui.navigation.ArchNotesNavHost
+import com.example.archnotes.ui.ArchNotesNavHost
 import com.example.archnotes.ui.theme.ArchNotesTheme
 import dagger.hilt.android.AndroidEntryPoint
 

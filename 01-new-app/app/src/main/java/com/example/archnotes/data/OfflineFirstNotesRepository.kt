@@ -1,17 +1,14 @@
 package com.example.archnotes.data
 
-import com.example.archnotes.data.di.IoDispatcher
 import com.example.archnotes.data.local.NoteDao
 import com.example.archnotes.data.local.NoteEntity
 import com.example.archnotes.data.local.asEntity
 import com.example.archnotes.data.local.asModel
 import com.example.archnotes.data.remote.NoteRemoteDataSource
 import com.example.archnotes.model.Note
-import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -23,44 +20,56 @@ import javax.inject.Singleton
  * - サーバーから取得したデータは一度 Room に書き込み、その変更が Flow を通じて UI に届く。
  * - こうすると「オフラインでも直前の内容が見える」「どこから見ても同じデータ」が自然に実現する。
  *
+ * **スレッドについて**: Room の suspend 関数 / Flow も、[NoteRemoteDataSource] の契約も main-safe
+ * なので、この Repository に `withContext(Dispatchers.IO)` は不要。
+ * ブロッキングな API(旧来の HTTP クライアントなど)を使う場合は、それを包む DataSource の中で
+ * `withContext` を書き、Repository より上には漏らさない。
+ *
  * 依存するものはすべてコンストラクタで受け取る(コンストラクタインジェクション)。
- * `NoteDao` / `NoteRemoteDataSource` をインターフェースで受け取るので、
- * テストでは偽物に差し替えられる。
+ * `NoteDao` / `NoteRemoteDataSource` はインターフェースなので、テストでは偽物に差し替えられる
+ * (→ src/test の OfflineFirstNotesRepositoryTest)。
  */
 @Singleton
 class OfflineFirstNotesRepository @Inject constructor(
     private val noteDao: NoteDao,
     private val remoteDataSource: NoteRemoteDataSource,
-    @IoDispatcher private val ioDispatcher: CoroutineDispatcher,
 ) : NotesRepository {
 
+    // Room の Flow はテーブルのどの行が変わっても再発行するので、
+    // 中身が同じなら流さない distinctUntilChanged を挟んで UI の無駄な再描画を避ける
     override fun observeNotes(): Flow<List<Note>> =
         noteDao.observeAll()
             .map { entities -> entities.map(NoteEntity::asModel) }
             .distinctUntilChanged()
 
     override fun observeNote(id: Long): Flow<Note?> =
-        noteDao.observeById(id).map { it?.asModel() }
+        noteDao.observeById(id)
+            .map { it?.asModel() }
+            .distinctUntilChanged()
 
-    // Room の suspend 関数は内部で適切なスレッドに切り替えてくれる(main-safe)ので、
-    // ここで withContext を書く必要はない。
-    override suspend fun saveNote(note: Note): Long = noteDao.upsert(note.asEntity())
+    override suspend fun saveNote(note: Note): Long {
+        // モデルはサーバー側 ID を持たないので、既存行の remoteId を引き継ぐ
+        val existing = if (note.id == Note.NEW_NOTE_ID) null else noteDao.getById(note.id)
+        val rowId = noteDao.upsert(note.asEntity().copy(remoteId = existing?.remoteId))
+        // upsert の戻り値は INSERT 時のみ行 ID(UPDATE 時は -1)なので、ここで契約をそろえる
+        return if (note.id == Note.NEW_NOTE_ID) rowId else note.id
+    }
 
     override suspend fun deleteNote(id: Long) = noteDao.deleteById(id)
 
-    // ネットワーク応答の変換のように CPU/IO を使う処理は、Repository が責任を持って
-    // バックグラウンドに逃がす。呼び出し側(ViewModel)はメインスレッドから安全に呼べる。
-    override suspend fun refresh() = withContext(ioDispatcher) {
+    override suspend fun refresh() {
         val remoteNotes = remoteDataSource.fetchNotes()
-        noteDao.upsertAll(
-            remoteNotes.map { network ->
-                NoteEntity(
-                    id = network.id,
-                    title = network.title,
-                    body = network.body,
-                    updatedAt = network.updatedAt,
-                )
-            },
-        )
+        val entities = remoteNotes.map { network ->
+            // サーバー ID でローカルの行を探し、あればその行を更新、なければ新規行として挿入する
+            val local = noteDao.getByRemoteId(network.id)
+            NoteEntity(
+                id = local?.id ?: 0,
+                remoteId = network.id,
+                title = network.title,
+                body = network.body,
+                updatedAt = network.updatedAt,
+            )
+        }
+        noteDao.upsertAll(entities)
     }
 }

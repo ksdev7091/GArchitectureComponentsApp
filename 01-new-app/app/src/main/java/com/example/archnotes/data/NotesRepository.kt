@@ -25,7 +25,7 @@ interface NotesRepository {
 
     /**
      * メモを保存する。[Note.id] が [Note.NEW_NOTE_ID] なら新規作成、それ以外は更新。
-     * @return 保存後の ID
+     * @return 保存後の ID(新規なら採番された ID、更新なら渡した ID)
      */
     suspend fun saveNote(note: Note): Long
 
@@ -33,6 +33,7 @@ interface NotesRepository {
 
     /**
      * サーバーから最新のメモを取得してローカル DB に取り込む。
+     * 同じサーバー ID のメモが既にあれば上書きする(「サーバーが正」の単純な同期)。
      * 結果は [observeNotes] を通じて自動的に UI に届くので、戻り値は持たない。
      * @throws java.io.IOException 通信に失敗した場合
      */

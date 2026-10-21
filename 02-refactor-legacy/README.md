@@ -27,13 +27,16 @@ Todo アプリ(追加・完了・削除・「n 件中 m 件完了」の集計)�
    Project ビューで 2 つのファイル(例: `step1-repository/.../MainActivity.kt` と `step2-viewmodel/.../MainActivity.kt`)を
    Ctrl クリックで選択 → 右クリック → **Compare Files**。
 4. 実行構成で各ステップのアプリを起動して、動作が同じであることを確かめる。
-   Step 3 以降は DB 名が変わるため、Step 2 までのデータは引き継がれません(別アプリとしてインストールされます)。
+   各ステップは applicationId が異なる別アプリとしてインストールされるので、データはどのステップ間でも共有されません(各アプリで入れ直してください)。
 
 ## 各ステップで変わるファイル / 変わらないファイル
 
+「=」は前ステップのファイルを **コメントも含めてそのままコピー** したもので、Compare Files で差分ゼロになります
+(解説コメントは、そのファイルを導入・変更したステップの時点のものが残ります)。`strings.xml` だけはアプリ名が各ステップで違います。
+
 ```
                  step0  step1  step2  step3  step4  step5
-MainActivity      ●      ●      ●      =      ●      ●     (= は前ステップと同一)
+MainActivity      ●      ●      ●      =      ●      ●     (= は前ステップとファイル単位で完全に同一)
 Todo (model)      ●      移動   =      =      =      =
 TodoDbHelper      ●      移動   =      削除
 TodoRepository           ●      =      ●      =      =
@@ -56,5 +59,6 @@ Step 3 で DB を Room に変えても MainActivity は無変更、Step 5 で UI
 ./gradlew :step4-hilt-test:testDebugUnitTest :step5-compose:testDebugUnitTest
 ```
 
-Step 0〜3 にテストがないのは意図的です。Step 0 ではテストを書く「継ぎ目」が存在せず、
-Step 1〜3 で継ぎ目を作っていき、Step 4 で初めてテストを書けるようになる、という流れを体験してください。
+Step 0〜3 にテストがないのは意図的です。Step 0 ではテストを書く「継ぎ目」が存在しません。
+Step 1 で Repository をインターフェースにした時点で Fake が、Step 2 で ViewModel から Android 依存を外した時点で
+ViewModel のテストが書ける形になり、Step 4 で実際に書く、という流れを体験してください。

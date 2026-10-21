@@ -13,8 +13,9 @@ import javax.inject.Singleton
  * - 3 回に 1 回は失敗する(IOException)
  *
  * 本物の API クライアントに差し替えるときは、[NoteRemoteDataSource] を実装した
- * 別クラスを作り、DI モジュールのバインド先を変えるだけでよい。
- * Repository や ViewModel には一切手を入れずに済む。これが「抽象に依存する」利点。
+ * 別クラスを作り、DI モジュールのバインド先を変える。
+ * 「失敗は IOException」という契約を守っていれば、Repository や ViewModel には手を入れずに済む。
+ * これが「抽象に依存する」利点。
  */
 @Singleton
 class FakeNoteRemoteDataSource @Inject constructor() : NoteRemoteDataSource {
@@ -28,22 +29,22 @@ class FakeNoteRemoteDataSource @Inject constructor() : NoteRemoteDataSource {
             throw IOException("疑似ネットワークエラー (callCount=$callCount)")
         }
         val now = System.currentTimeMillis()
-        // ID はローカルの autoGenerate と衝突しないよう大きな値にしている(学習用の簡略化)
+        // サーバー側 ID は文字列。ローカル DB の自動採番 ID とは別のカラムに保存されるので衝突しない
         return listOf(
             NetworkNote(
-                id = 1_000_001,
-                title = "サーバーのメモ: アーキテクチャの 2 原則",
+                id = "srv-1",
+                title = "サーバーのメモ: 関心の分離とデータ駆動 UI",
                 body = "1. 関心の分離 (Separation of concerns)\n2. データモデルから UI を駆動する (Drive UI from data models)",
                 updatedAt = now - 3 * 60_000,
             ),
             NetworkNote(
-                id = 1_000_002,
+                id = "srv-2",
                 title = "サーバーのメモ: 単方向データフロー",
                 body = "状態は上(ViewModel)から下(UI)へ流れ、イベントは下から上へ流れる。",
                 updatedAt = now - 2 * 60_000,
             ),
             NetworkNote(
-                id = 1_000_003,
+                id = "srv-3",
                 title = "サーバーのメモ: 唯一の信頼できる情報源",
                 body = "このアプリでは Room が Single Source of Truth。サーバーの応答は一度 Room に書き込んでから UI に届く。",
                 updatedAt = now - 60_000,

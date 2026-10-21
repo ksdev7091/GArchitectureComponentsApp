@@ -5,6 +5,7 @@ import com.example.archnotes.domain.GetNotesUseCase
 import com.example.archnotes.model.Note
 import com.example.archnotes.testing.FakeNotesRepository
 import com.example.archnotes.testing.MainDispatcherRule
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -13,6 +14,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -23,6 +25,9 @@ import org.junit.Test
  * - Android の View/Context に依存していない
  * - Repository をインターフェース経由で受け取っている(Fake を差し込める)
  * からである。アーキテクチャの価値はテストの書きやすさに最もはっきり現れる。
+ *
+ * 注意: 並び順(更新日時の新しい順)は本物では DAO の SQL が決めるので、ここでは検証しない。
+ * 並び順のテストは androidTest の NoteDaoTest にある。
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class NotesViewModelTest {
@@ -37,8 +42,8 @@ class NotesViewModelTest {
         NotesViewModel(getNotes = GetNotesUseCase(repository), notesRepository = repository)
 
     @Test
-    fun `Repository のメモが更新日時の新しい順で uiState に反映される`() = runTest {
-        val repository = FakeNotesRepository(listOf(note(1, "古いメモ"), note(2, "新しいメモ")))
+    fun `Repository のメモがそのまま uiState に反映され、読込中が解除される`() = runTest {
+        val repository = FakeNotesRepository(listOf(note(1, "メモ A"), note(2, "メモ B")))
         val viewModel = createViewModel(repository)
         // stateIn(WhileSubscribed) は購読者がいないと動かないので、テスト内で購読しておく
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect() }
@@ -46,7 +51,7 @@ class NotesViewModelTest {
         val state = viewModel.uiState.value
 
         assertFalse(state.isLoading)
-        assertEquals(listOf("新しいメモ", "古いメモ"), state.notes.map { it.title })
+        assertEquals(listOf("メモ A", "メモ B"), state.notes.map { it.title })
     }
 
     @Test
@@ -60,6 +65,37 @@ class NotesViewModelTest {
         val state = viewModel.uiState.value
         assertEquals("kotlin", state.query)
         assertEquals(listOf("勉強"), state.notes.map { it.title })
+    }
+
+    @Test
+    fun `同期に成功すると Repository 経由でサーバーのメモが一覧に現れる`() = runTest {
+        val repository = FakeNotesRepository(listOf(note(1, "ローカル")))
+        val viewModel = createViewModel(repository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect() }
+
+        viewModel.refresh()
+
+        val state = viewModel.uiState.value
+        // ViewModel はサーバーの応答を直接受け取っていない。Repository(SSOT)の変化が流れてきただけ
+        assertEquals(listOf("ローカル", "remote"), state.notes.map { it.title })
+        assertFalse(state.isRefreshing)
+        assertNull(state.userMessageRes)
+    }
+
+    @Test
+    fun `同期中は isRefreshing が true になり、その間の再要求は無視される`() = runTest {
+        val repository = FakeNotesRepository().apply { refreshGate = CompletableDeferred() }
+        val viewModel = createViewModel(repository)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect() }
+
+        viewModel.refresh()
+        assertTrue(viewModel.uiState.value.isRefreshing)
+
+        viewModel.refresh() // 同期中の二度目は無視される
+        assertEquals(1, repository.refreshCount)
+
+        repository.refreshGate!!.complete(Unit)
+        assertFalse(viewModel.uiState.value.isRefreshing)
     }
 
     @Test

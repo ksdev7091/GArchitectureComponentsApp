@@ -44,7 +44,7 @@ android-architecture-learning/
 - Android Studio で `01-new-app` または `02-refactor-legacy` フォルダを **Open** する。
 - `local.properties` の `sdk.dir` がこの PC の SDK パスを指しています。別の PC では Android Studio が自動生成します。
 - 02 では実行構成のドロップダウンから `step0-legacy` 〜 `step5-compose` を選んで実行します。
-- 単体テスト: `./gradlew testDebugUnitTest`(01 は 9 件、02 は Step 4・5 に各 4 件)。
+- 単体テスト: `./gradlew testDebugUnitTest`(01 は 19 件、02 は Step 4・5 に各 4 件)。
 - 01 の `NoteDaoTest` は端末/エミュレータで動く Instrumented Test です(`./gradlew connectedDebugAndroidTest`)。
 - Windows でフォルダのパスが極端に長い場所(260 文字近く)に置くと、`compileDebugJavaWithJavac` で jlink の起動に失敗することがあります。
   `C:\Users\<name>\AndroidStudioProjects\` のような通常の場所に置いてください。

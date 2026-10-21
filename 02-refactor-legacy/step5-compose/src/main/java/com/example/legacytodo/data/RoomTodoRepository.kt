@@ -9,6 +9,11 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * 【Step 4 で変更】`@Inject constructor` を付けた。
+ * これだけで Hilt は「TodoDao をくれれば RoomTodoRepository を作れる」と理解する。
+ * `@Singleton` でアプリ内に 1 つだけ存在することを保証する。
+ */
 @Singleton
 class RoomTodoRepository @Inject constructor(
     private val todoDao: TodoDao,

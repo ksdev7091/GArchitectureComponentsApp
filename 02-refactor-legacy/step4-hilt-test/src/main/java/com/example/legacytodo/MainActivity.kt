@@ -44,7 +44,7 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.add_button).setOnClickListener {
             viewModel.addTodo(input.text.toString())
-            input.text.clear()
+            input.text.clear() // 成否を待たずにクリアする(空文字のときは消しても同じ)
         }
 
         lifecycleScope.launch {
@@ -56,7 +56,11 @@ class MainActivity : AppCompatActivity() {
 
     private fun render(state: TodoUiState) {
         adapter.submit(state.todos)
-        summaryText.text = getString(R.string.summary_format, state.totalCount, state.doneCount)
+        summaryText.text = if (state.isLoading) {
+            getString(R.string.loading)
+        } else {
+            getString(R.string.summary_format, state.totalCount, state.doneCount)
+        }
 
         state.errorMessageRes?.let { messageRes ->
             Toast.makeText(this, messageRes, Toast.LENGTH_SHORT).show()

@@ -20,8 +20,10 @@ import androidx.appcompat.app.AppCompatActivity
  *
  * ① Activity が「画面」「DB アクセス」「スレッド管理」「業務ロジック」をすべて抱えている。
  *    → 1 ファイルが肥大化し、どこを直せば何が変わるのか読み解けなくなる。
- * ② 生の Thread + runOnUiThread。Activity が destroy された後に runOnUiThread が走る可能性がある。
- *    → 画面回転中にクラッシュ/リーク。エラー処理もない。
+ * ② 生の Thread は Activity のライフサイクルと無関係に走り続ける。
+ *    → 回転中は破棄済みの Activity を掴んだままになる(リーク)。onDestroy で dbHelper.close() した
+ *      直後に別スレッドが DB を触るとクラッシュしうる。
+ *    (DB エラーの扱いはこのキットでは扱わない。01-new-app の refresh() を参照)
  * ③ 状態(todos)が Activity のフィールドにある。画面回転のたびに Activity が作り直され、
  *    毎回 DB から読み直す。読み直し中は一瞬リストが空になる。
  * ④ 「何件中何件完了」のような業務ロジックが UI コードに埋まっている。
@@ -58,7 +60,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        dbHelper.close()
+        dbHelper.close() // ② まだ走っている Thread が DB を使っていたら例外になる
     }
 
     // ① DB アクセスが Activity に直接書かれている
@@ -79,7 +81,7 @@ class MainActivity : AppCompatActivity() {
                     )
                 }
             }
-            runOnUiThread { // ② Activity が既に destroy されていても呼ばれる
+            runOnUiThread { // ② Activity が既に destroy されていても呼ばれる(古い画面に描く)
                 todos.clear()
                 todos.addAll(result)
                 adapter.notifyDataSetChanged()

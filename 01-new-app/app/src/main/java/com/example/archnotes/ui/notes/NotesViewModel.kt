@@ -60,7 +60,9 @@ class NotesViewModel @Inject constructor(
     private val isRefreshing = MutableStateFlow(false)
     private val userMessageRes = MutableStateFlow<Int?>(null)
 
-    // 検索語が変わるたびに、Domain 層から新しい Flow を取り直す
+    // 検索語が変わるたびに、Domain 層から新しい Flow を取り直す。
+    // (1 文字ごとに Room のクエリを張り直すことになる。この規模では問題ないが、
+    //  大きなテーブルなら observeNotes() と query を combine してメモリ上で絞る方が軽い)
     private val notes = query.flatMapLatest { getNotes(it) }
 
     /**
@@ -100,6 +102,8 @@ class NotesViewModel @Inject constructor(
                 notesRepository.refresh()
             } catch (e: IOException) {
                 // 例外は UI に投げず「状態」に変換する。UI はこの状態を見て Snackbar を出す。
+                // catch する型は Data 層の契約(通信失敗 = IOException)に合わせる。
+                // `catch (e: Exception)` と書くとコルーチンのキャンセルまで握りつぶしてしまう。
                 userMessageRes.value = R.string.notes_refresh_failed
             } finally {
                 isRefreshing.value = false

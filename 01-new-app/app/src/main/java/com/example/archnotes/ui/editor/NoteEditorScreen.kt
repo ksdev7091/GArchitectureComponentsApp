@@ -37,11 +37,16 @@ fun NoteEditorScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     // 「保存完了 → 画面を閉じる」も状態から導く。UI が勝手に閉じるタイミングを決めない。
+    // 画面が pop されれば ViewModel ごと破棄されるので、isSaved を消してもらう必要はない。
     LaunchedEffect(uiState.isSaved) {
         if (uiState.isSaved) onDone()
     }
 
     NoteEditorScreen(
+        // テキストはスナップショット状態なので、読むだけで変更が再コンポーズに反映される
+        title = viewModel.title,
+        body = viewModel.body,
+        canSave = viewModel.canSave,
         uiState = uiState,
         onTitleChange = viewModel::onTitleChange,
         onBodyChange = viewModel::onBodyChange,
@@ -53,6 +58,9 @@ fun NoteEditorScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteEditorScreen(
+    title: String,
+    body: String,
+    canSave: Boolean,
     uiState: NoteEditorUiState,
     onTitleChange: (String) -> Unit,
     onBodyChange: (String) -> Unit,
@@ -78,7 +86,7 @@ fun NoteEditorScreen(
                     }
                 },
                 actions = {
-                    TextButton(onClick = onSave, enabled = uiState.canSave) {
+                    TextButton(onClick = onSave, enabled = canSave) {
                         Text(stringResource(R.string.editor_save))
                     }
                 },
@@ -103,14 +111,14 @@ fun NoteEditorScreen(
                 .padding(16.dp),
         ) {
             OutlinedTextField(
-                value = uiState.title,
+                value = title,
                 onValueChange = onTitleChange,
                 modifier = Modifier.fillMaxWidth(),
                 label = { Text(stringResource(R.string.editor_title_hint)) },
                 singleLine = true,
             )
             OutlinedTextField(
-                value = uiState.body,
+                value = body,
                 onValueChange = onBodyChange,
                 modifier = Modifier
                     .fillMaxWidth()
@@ -127,7 +135,10 @@ fun NoteEditorScreen(
 private fun NoteEditorScreenPreview() {
     ArchNotesTheme {
         NoteEditorScreen(
-            uiState = NoteEditorUiState(title = "タイトル", body = "本文", isNew = false),
+            title = "タイトル",
+            body = "本文",
+            canSave = true,
+            uiState = NoteEditorUiState(isNew = false),
             onTitleChange = {},
             onBodyChange = {},
             onSave = {},

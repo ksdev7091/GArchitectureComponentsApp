@@ -5,6 +5,13 @@ import androidx.room.Insert
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * 【Step 3 で新設】DAO。SQL はここに集約され、列名の typo はコンパイル時に検出される。
+ *
+ * 一番大事なのは [observeAll] の戻り値が **Flow** であること。
+ * テーブルが変わるたびに Room が自動で再クエリして新しいリストを流す。
+ * これで「書き込んだら手で読み直す」が不要になる。
+ */
 @Dao
 interface TodoDao {
 

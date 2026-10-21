@@ -17,13 +17,19 @@ import com.example.legacytodo.ui.TodoViewModel
 import kotlinx.coroutines.launch
 
 /**
- * 【Step 3: Room + Flow】MainActivity は Step 2 から **1 行も変わっていない**。
+ * 【Step 2: ViewModel と UI 状態を導入する】
  *
- * データの持ち方が SQLiteOpenHelper から Room に変わり、取得方法が pull から push に変わっても、
- * UI 層には影響がない。これが層を分けた見返り。
+ * Activity の仕事は 2 つだけになった:
+ * 1. ViewModel の状態([TodoUiState])を受け取って画面に描く([render])
+ * 2. ユーザー操作を ViewModel のメソッド呼び出しに変換する
+ *
+ * これが「単方向データフロー(UDF)」。状態は ViewModel → Activity へ、
+ * イベントは Activity → ViewModel へ、それぞれ一方向にしか流れない。
+ * Activity はもう `todos` を持たないし、DB のことも集計のことも知らない。
  */
 class MainActivity : AppCompatActivity() {
 
+    // 画面回転しても同じインスタンスが返ってくる
     private val viewModel: TodoViewModel by viewModels { TodoViewModel.Factory }
 
     private lateinit var summaryText: TextView
@@ -44,9 +50,11 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<Button>(R.id.add_button).setOnClickListener {
             viewModel.addTodo(input.text.toString())
-            input.text.clear()
+            input.text.clear() // 成否を待たずにクリアする(空文字のときは消しても同じ)
         }
 
+        // 画面が表示されている間(STARTED 以上)だけ状態を購読する。
+        // バックグラウンドに回ったら自動で購読を止め、戻ったら再開する。
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 viewModel.uiState.collect { state -> render(state) }
@@ -54,13 +62,18 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /** 状態 → 画面。ここには「判断」を書かない。状態をそのまま映すだけ。 */
     private fun render(state: TodoUiState) {
         adapter.submit(state.todos)
-        summaryText.text = getString(R.string.summary_format, state.totalCount, state.doneCount)
+        summaryText.text = if (state.isLoading) {
+            getString(R.string.loading)
+        } else {
+            getString(R.string.summary_format, state.totalCount, state.doneCount)
+        }
 
         state.errorMessageRes?.let { messageRes ->
             Toast.makeText(this, messageRes, Toast.LENGTH_SHORT).show()
-            viewModel.errorMessageShown()
+            viewModel.errorMessageShown() // 表示し終えたことを伝え、二重表示を防ぐ
         }
     }
 }

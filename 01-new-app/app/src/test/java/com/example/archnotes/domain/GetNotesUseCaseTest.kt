@@ -22,14 +22,14 @@ class GetNotesUseCaseTest {
     private val getNotes = GetNotesUseCase(repository)
 
     @Test
-    fun `検索語が空なら全件返す`() = runTest {
+    fun `検索語が空なら全件をそのまま返す`() = runTest {
         val result = getNotes("").first()
-        assertEquals(listOf(3L, 2L, 1L), result.map { it.id })
+        assertEquals(listOf(1L, 2L, 3L), result.map { it.id })
     }
 
     @Test
     fun `タイトルか本文に含まれるメモだけを返す(大文字小文字と前後の空白は無視)`() = runTest {
         val result = getNotes("  kotlin ").first()
-        assertEquals(listOf(2L, 1L), result.map { it.id })
+        assertEquals(listOf(1L, 2L), result.map { it.id })
     }
 }

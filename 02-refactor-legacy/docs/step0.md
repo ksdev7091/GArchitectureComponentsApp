@@ -21,7 +21,7 @@ step0-legacy/src/main/java/com/example/legacytodo/
 | # | 問題 | 何が起きるか | 反している原則 |
 |---|---|---|---|
 | ① | Activity が全部やっている | 1 ファイルが肥大化し、修正の影響範囲が読めない | 関心の分離 |
-| ② | 生の `Thread` + `runOnUiThread` | Activity が destroy された後に UI を触ってクラッシュ/リーク。エラー処理なし | Activity を信用しない |
+| ② | 生の `Thread` + `runOnUiThread` | Thread が破棄済みの Activity を掴んだまま走り続ける(リーク)。`onDestroy` の `dbHelper.close()` と別スレッドの DB アクセスが競合するとクラッシュ | Activity を信用しない |
 | ③ | 状態が Activity のフィールド | 回転のたびに DB を読み直す。読み直し中は一瞬空になる | データモデルから UI を駆動する |
 | ④ | 業務ロジックが UI に埋まっている | 「完了数の集計」「空文字チェック」をテストするには画面を起動するしかない | 関心の分離 |
 | ⑤ | 依存を自分で `new` している | `TodoDbHelper` を差し替える手段がなく、テストで本物の DB が必要 | DI |
@@ -37,6 +37,9 @@ step0-legacy/src/main/java/com/example/legacytodo/
 - 「集計ロジックが間違っていた」→ 直したあと正しいことをどう確かめる? エミュレータで手動で数える。
 
 アーキテクチャは「今日動くか」ではなく「明日変えられるか」のためにあります。
+
+なお、DB アクセスのエラー処理(例外が出たときにどう知らせるか)は Step 0〜5 を通して扱いません。
+「例外を状態に変換する」パターンは [01-new-app の NotesViewModel.refresh()](../../01-new-app/app/src/main/java/com/example/archnotes/ui/notes/NotesViewModel.kt) を参照してください。
 
 ## 書き込み後の手動再読込
 

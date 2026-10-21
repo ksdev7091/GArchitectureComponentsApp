@@ -14,7 +14,13 @@ import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 
-/** Step 4 のテストがそのまま通る。UI を Compose に差し替えても ViewModel の仕様は変わらない。 */
+/**
+ * 【Step 4 で新設】Step 0 では不可能だった「画面ロジックの自動テスト」。
+ *
+ * - エミュレータ不要。JVM 上で数ミリ秒。
+ * - 「追加したら件数が増える」「完了にすると完了数が増える」「空文字はエラー」といった
+ *   仕様をコードとして残せる。次のリファクタリング(Step 5: Compose 化)の安全網になる。
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class TodoViewModelTest {
 

@@ -15,8 +15,8 @@
 step2-viewmodel/src/main/java/com/example/legacytodo/
 ├── MainActivity.kt           状態を描く + イベントを渡す、だけになった
 ├── TodoApplication.kt        ★新設: AppContainer(手動 DI)
-├── model/Todo.kt
-├── data/                     (Step 1 と同一)
+├── model/Todo.kt             (Step 1 と同一)
+├── data/                     (Step 1 と同一。ファイル単位で完全一致)
 └── ui/
     ├── TodoViewModel.kt      ★新設: TodoUiState + TodoViewModel
     └── TodoAdapter.kt        ★分離: submit(list) で受け取り、コールバックで返すだけ
@@ -25,6 +25,7 @@ step2-viewmodel/src/main/java/com/example/legacytodo/
 1. **`TodoUiState` を定義した**
    `todos`、`isLoading`、`errorMessageRes` を持つ不変の data class。
    `doneCount` は `todos` から計算できるので、フィールドではなく計算プロパティ(二重管理しない)。
+   `isLoading` の間は件数の代わりに「読み込み中…」を出す(状態に入れたものは必ず画面に映す)。
 2. **`TodoViewModel` を作った**
    `MutableStateFlow<TodoUiState>` を持ち、`uiState` として公開する。
    `addTodo` / `setDone` / `deleteTodo` を受け取り、Repository を呼んだあと状態を更新する。
@@ -33,6 +34,9 @@ step2-viewmodel/src/main/java/com/example/legacytodo/
    ユーザー操作は `viewModel.xxx()` を呼ぶだけ。
 4. **`AppContainer` を Application に置き、Repository の組み立てを 1 か所に集めた**
    ViewModel の `Factory` がそこから Repository を受け取る。
+   Repository(と DbHelper)がアプリ全体で 1 つになったので、Step 1 で Activity がやっていた `onDestroy` の `close()` も不要になった。
+   細かい挙動の違いとして、入力欄は追加ボタンを押した時点でクリアするようになった(Step 1 までは保存成功後)。
+   ViewModel は結果を返さないので UI は成否を待てないが、空文字のときは消しても同じなので問題ない。
 5. **Adapter を独立したクラスにした**
    `submit(todos)` で表示データを受け取り、操作はコンストラクタで受け取ったコールバックで返す。
 

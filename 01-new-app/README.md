@@ -18,42 +18,50 @@ app/src/main/java/com/example/archnotes/
 ├── model/
 │   └── Note.kt                   アプリ全体で使うモデル(層をまたぐ唯一のデータ型)
 ├── ui/                           ── UI 層 ──
-│   ├── navigation/ArchNotesNavHost.kt   画面遷移。型安全ルート
+│   ├── ArchNotesNavHost.kt       画面遷移。各画面の登録関数を呼ぶだけ
 │   ├── notes/
+│   │   ├── NotesNavigation.kt    一覧画面のルートと NavGraph 登録関数
 │   │   ├── NotesViewModel.kt     NotesUiState + 状態ホルダー
 │   │   └── NotesScreen.kt        状態あり版 / 状態なし版の Composable
 │   ├── editor/
-│   │   ├── NoteEditorViewModel.kt   SavedStateHandle の使い方
+│   │   ├── NoteEditorNavigation.kt  編集画面のルート、遷移関数、NavGraph 登録関数
+│   │   ├── NoteEditorViewModel.kt   SavedStateHandle、スナップショット状態、二重保存防止
 │   │   └── NoteEditorScreen.kt
 │   └── theme/Theme.kt
 ├── domain/                       ── Domain 層(省略可) ──
 │   └── GetNotesUseCase.kt        検索語でフィルタする
 └── data/                         ── Data 層 ──
     ├── NotesRepository.kt        公開 API(インターフェース)
-    ├── OfflineFirstNotesRepository.kt   Room を SSOT とする実装
-    ├── local/                    Room: NoteEntity, NoteDao, NotesDatabase
-    ├── remote/                   NoteRemoteDataSource(抽象)と Fake 実装
+    ├── OfflineFirstNotesRepository.kt   Room を SSOT とする実装。サーバー ID でローカル行を照合
+    ├── local/                    Room: NoteEntity(id と remoteId), NoteDao, NotesDatabase
+    ├── remote/                   NoteRemoteDataSource(抽象、失敗は IOException)と Fake 実装
     └── di/                       Hilt モジュール: 何をどう組み立てるか
 
-app/src/test/        JVM 単体テスト(ViewModel × 2, UseCase)と Fake / テストルール
+app/src/test/        JVM 単体テスト 19 件(ViewModel × 2, UseCase, Repository)と Fake / テストルール
 app/src/androidTest/ Room DAO の Instrumented Test
 ```
 
 依存の向き: `ui → domain → data`。逆方向の import は 1 つもありません。
+UI 層が Data 層を直接使うのは許されています(`NotesViewModel` は削除・同期で Repository を直接呼ぶ)。
 `model/Note` だけはすべての層から参照されます。
+ルート定義は各画面のパッケージが持ち、`ArchNotesNavHost` がそれに依存します(画面側は NavHost を知らない)。
 
 ## 読む順番
 
 1. `model/Note.kt` — 2 分。これが何を表すかを把握する。
 2. `data/NotesRepository.kt` — インターフェースのコメントを読む。「読み取りは Flow、書き込みは suspend」の理由。
-3. `data/OfflineFirstNotesRepository.kt` — SSOT とオフラインファースト。`refresh()` がサーバーの応答を UI に返さず Room に書く点に注目。
-4. `data/local/` と `data/remote/` — Entity / DTO / モデルを分ける理由。
+3. `data/OfflineFirstNotesRepository.kt` — SSOT とオフラインファースト。`refresh()` がサーバーの応答を UI に返さず Room に書く点、
+   サーバー ID(`remoteId`)でローカル行を照合する点、`withContext` が不要な理由に注目。
+4. `data/local/` と `data/remote/` — Entity / DTO / モデルを分ける理由。ローカル ID とサーバー ID を別カラムに持つ理由。
+   DataSource が「失敗は IOException」という契約を持つ理由。
 5. `domain/GetNotesUseCase.kt` — Domain 層の形と、置く/置かないの判断。
 6. `ui/notes/NotesViewModel.kt` — 複数の StateFlow を `combine` して 1 つの UiState にする。例外を状態に変換する。
-7. `ui/notes/NotesScreen.kt` — 状態あり版と状態なし版。「一度きりの通知」の扱い。
-8. `ui/editor/NoteEditorViewModel.kt` — SavedStateHandle。プロセス再生成後にユーザーの編集を上書きしない工夫。
-9. `data/di/` — Hilt モジュール。Fake と本物の差し替えが 1 行で済むことを確認。
-10. `src/test/` — ViewModel が JVM だけでテストできることを確認。
+7. `ui/notes/NotesScreen.kt` — 状態あり版と状態なし版。「一度きりの通知」の扱い(受け取ったらすぐ消してもらう)。
+8. `ui/editor/NoteEditorViewModel.kt` — 画面引数、入力テキストをスナップショット状態 + `savedStateHandle.saveable` で持つ理由、
+   プロセス再生成後にユーザーの編集を上書きしない工夫、保存ボタン連打の防止。
+9. `ui/editor/NoteEditorNavigation.kt` と `ui/ArchNotesNavHost.kt` — ルートを画面側に置く理由。
+10. `data/di/` — Hilt モジュール。Fake と本物の差し替えが 1 行で済むことを確認。
+11. `src/test/` — ViewModel と Repository が JVM だけでテストできることを確認。
 
 ## データの流れを追う: 検索語を 1 文字入力したとき
 
@@ -72,23 +80,32 @@ UI が関わるのは 1 と 8 だけ。「何件に絞られるか」を UI は�
 
 1. `IconButton(onClick = onRefresh)` → `NotesViewModel.refresh()`
 2. `isRefreshing.value = true` → `combine` が走り UiState の `isRefreshing = true` → UI に `LinearProgressIndicator` が出る
-3. `notesRepository.refresh()` → `withContext(ioDispatcher)` でバックグラウンドへ
-4. `FakeNoteRemoteDataSource.fetchNotes()` が 1.2 秒待って 3 件返す(3 回に 1 回 `IOException`)
-5. 成功: `noteDao.upsertAll(...)` で Room に書く → Room の `observeAll()` Flow が新しいリストを流す → 6〜8 と同じ経路で UI が更新される。
+3. `notesRepository.refresh()` → `FakeNoteRemoteDataSource.fetchNotes()` が 1.2 秒待って 3 件返す(3 回に 1 回 `IOException`)。
+   Room も DataSource も main-safe なので、Repository は `withContext` を書いていない
+4. 成功: 各メモのサーバー ID でローカル行を探し(`getByRemoteId`)、あればその行、なければ新規行として `upsertAll`
+   → Room の `observeAll()` Flow が新しいリストを流す → 検索の流れの 6〜8 と同じ経路で UI が更新される。
    **ViewModel は Room の結果を受け取っていない**ことに注目。書いたら勝手に流れてくる。
-6. 失敗: ViewModel が `IOException` を catch → `userMessageRes.value = R.string.notes_refresh_failed` → UiState → UI が Snackbar を出す → `onUserMessageShown()` → `userMessageRes.value = null`
-7. `finally` で `isRefreshing.value = false`
+5. 失敗: ViewModel が `IOException` を catch → `userMessageRes.value = R.string.notes_refresh_failed` → UiState
+   → UI は `userMessageShown()` で状態を消してから Snackbar を出す
+6. `finally` で `isRefreshing.value = false`
 
 ## 単体テストの読み方
 
 - `testing/MainDispatcherRule.kt`: `viewModelScope` が使う `Dispatchers.Main` をテスト用に差し替える定番。
-- `testing/FakeNotesRepository.kt`: Room とネットワークの代わり。`shouldFailRefresh = true` でエラー経路も検証できる。
+- `testing/FakeNotesRepository.kt`: Room とネットワークの代わり。`shouldFailRefresh` でエラー経路、
+  `refreshGate` / `saveGate`(`CompletableDeferred`)で「同期中」「保存中」の途中状態を観察できる。
+- `testing/FakeNoteDao.kt`: Room の DAO の代わり。`upsert` が UPDATE 時に -1 を返す本物の挙動まで真似ている。
 - `NotesViewModelTest`: `stateIn(WhileSubscribed)` は購読者がいないと動かないので、`backgroundScope.launch { uiState.collect() }` で購読してから検証する。
+  並び順は本物では DAO の SQL が決めるので、ここでは検証しない(`NoteDaoTest` にある)。
 - `NoteEditorViewModelTest`: 画面引数は `SavedStateHandle(mapOf("noteId" to 7L))` で渡す。
+  「ロード済みフラグがあれば読み直さない」「連打しても 1 件」を検証している。
+- `OfflineFirstNotesRepositoryTest`: 「再同期しても重複しない」「ローカルのメモが消えない」「remoteId を失わない」を検証している。
 
 ## 本物のアプリにするとき
 
-- `FakeNoteRemoteDataSource` を Retrofit 実装に置き換え、`DataModule` の `@Binds` 先を変える。他は触らない。
+- `FakeNoteRemoteDataSource` を Retrofit 実装に置き換え、`DataModule` の `@Binds` 先を変える。
+  その実装の中で `HttpException` などを `IOException` に変換して契約を守れば、Repository と ViewModel は触らなくてよい。
+- 同期は「サーバーが正」の単純な上書き。ローカルの編集をサーバーへ送る、競合を解決する、といった双方向同期は別途設計が必要。
 - `NotesDatabase` の `exportSchema = true` にしてスキーマを Git 管理し、変更時は Migration を書く。
 - 画面が増えて同じロジックが 2 か所に現れたら UseCase へ。
-- ビルドが遅くなったら `:core:data` `:feature:notes` のようにモジュールへ切り出す(パッケージ構成がそのまま使える)。
+- ビルドが遅くなったら `:core:data` `:feature:notes` のようにモジュールへ切り出す(パッケージ構成と依存の向きがそのまま使える)。

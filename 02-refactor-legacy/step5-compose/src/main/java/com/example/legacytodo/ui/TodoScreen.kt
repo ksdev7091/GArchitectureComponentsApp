@@ -24,6 +24,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -35,6 +36,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.legacytodo.R
 import com.example.legacytodo.model.Todo
+import kotlinx.coroutines.launch
 
 /**
  * 【Step 5 で新設】activity_main.xml + item_todo.xml + TodoAdapter + MainActivity.render() が
@@ -63,16 +65,21 @@ fun TodoScreen(
     onDelete: (id: Long) -> Unit,
     onErrorShown: () -> Unit,
 ) {
-    // 入力中のテキストは「業務ロジックに関係しない UI 要素の状態」なので UI 側で持つ。
-    // rememberSaveable にしておけば画面回転でも消えない。
+    // 入力中のテキストは「ViewModel が保持する必要のない UI 要素の状態」なので UI 側で持つ
+    // (追加ボタンでイベントの引数として一度渡すだけ)。rememberSaveable なら回転でも消えない。
     var inputText by rememberSaveable { mutableStateOf("") }
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
-    uiState.errorMessageRes?.let { messageRes ->
-        val message = stringResource(messageRes)
-        LaunchedEffect(messageRes) {
-            snackbarHostState.showSnackbar(message)
+    // 「表示すべきメッセージがある」状態を受け取ったら、まず ViewModel に「受け取った」と伝えて
+    // 状態を消し、表示そのものは画面のスコープで行う。
+    // 表示が終わるまで消さずにいると、その間の回転で再表示されたり、同じメッセージの再発生を
+    // 取りこぼしたりする(StateFlow は同じ値を流さない)。
+    val errorMessage = uiState.errorMessageRes?.let { stringResource(it) }
+    LaunchedEffect(uiState.errorMessageRes) {
+        if (errorMessage != null) {
             onErrorShown()
+            scope.launch { snackbarHostState.showSnackbar(errorMessage) }
         }
     }
 
@@ -84,7 +91,11 @@ fun TodoScreen(
                 .padding(16.dp),
         ) {
             Text(
-                text = stringResource(R.string.summary_format, uiState.totalCount, uiState.doneCount),
+                text = if (uiState.isLoading) {
+                    stringResource(R.string.loading)
+                } else {
+                    stringResource(R.string.summary_format, uiState.totalCount, uiState.doneCount)
+                },
                 style = MaterialTheme.typography.titleMedium,
             )
             Row(verticalAlignment = Alignment.CenterVertically) {

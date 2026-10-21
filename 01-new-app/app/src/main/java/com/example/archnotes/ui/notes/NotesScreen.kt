@@ -31,6 +31,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -42,6 +43,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.archnotes.R
 import com.example.archnotes.model.Note
 import com.example.archnotes.ui.theme.ArchNotesTheme
+import kotlinx.coroutines.launch
 
 /**
  * 一覧画面(状態あり版)。ViewModel と接続する「入口」。
@@ -88,13 +90,19 @@ fun NotesScreen(
     onAddClick: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
-    // 「一度きりの通知」も状態として受け取り、表示し終えたら ViewModel に知らせる
-    uiState.userMessageRes?.let { messageRes ->
-        val message = stringResource(messageRes)
-        LaunchedEffect(messageRes) {
-            snackbarHostState.showSnackbar(message)
+    // 「一度きりの通知」も状態として受け取る。
+    // 受け取ったらまず ViewModel に「受け取った」と伝えて状態を消し、表示そのものは画面のスコープで行う。
+    // 表示が終わるまで消さずにいると、その間の回転で再表示されたり、同じメッセージの再発生を
+    // 取りこぼしたりする(StateFlow は同じ値を流さない)。
+    // 同じメッセージが連続して出るケースを厳密に扱うなら、公式ガイドのように ID 付きメッセージの
+    // リストにする。
+    val userMessage = uiState.userMessageRes?.let { stringResource(it) }
+    LaunchedEffect(uiState.userMessageRes) {
+        if (userMessage != null) {
             onUserMessageShown()
+            scope.launch { snackbarHostState.showSnackbar(userMessage) }
         }
     }
 

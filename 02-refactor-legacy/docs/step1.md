@@ -2,11 +2,10 @@
 
 モジュール: `step1-repository`(比較対象: `step0-legacy`)
 
-## 前のステップの課題
+## 前のステップの課題(このステップで解決するもの)
 
 - ① DB アクセスが Activity に直書きされている
-- ② 生の `Thread` + `runOnUiThread`。Activity 破棄後のクラッシュ、エラー処理なし
-- ⑤ `TodoDbHelper` を Activity が `new` している
+- ② 生の `Thread` + `runOnUiThread`。破棄済みの Activity を掴んだまま処理が走り続ける
 
 ## 何を変えたか
 
@@ -26,7 +25,10 @@ step1-repository/src/main/java/com/example/legacytodo/
    SQL も `ContentValues` もそのまま。`Thread { }` を `withContext(Dispatchers.IO) { }` に置き換えただけ。
 3. **MainActivity は `lifecycleScope.launch { repository.getTodos() }` と呼ぶだけになった**
 
-Compare Files で `MainActivity.kt` を見比べると、`loadTodos()` が 25 行から 8 行になっています。
+Compare Files で `MainActivity.kt` を見比べると、`loadTodos()` が 25 行から 9 行になっています。
+
+`SqliteTodoRepository` のコンストラクタにある `ioDispatcher` 引数は、テストで `Dispatchers.IO` を差し替えるための「継ぎ目」です。
+このキットでは使いませんが、Repository を JVM でテストするときの定石として置いてあります(Room 化する Step 3 で不要になります)。
 
 ## なぜこれで解決するのか
 
@@ -42,10 +44,18 @@ Step 0 では Activity が「DB は別スレッドで、結果はメインスレ
 Step 1 では Repository の中で `withContext(Dispatchers.IO)` をやるので、
 **呼び出し側はメインスレッドから普通に呼ぶだけ**です。これを main-safe と呼びます。
 
-### lifecycleScope: Activity が消えたら処理も止まる
+### lifecycleScope: Activity が消えたら続きの処理は止まる
 
 `lifecycleScope.launch` で起動したコルーチンは、Activity の `onDestroy` で自動的にキャンセルされます。
-Step 0 の「destroy 後に `runOnUiThread` が走る」問題はこれで消えました。
+Step 0 の「destroy 後に古い Activity の画面を更新しようとする」問題はこれで消えました。
+ただし `withContext(IO)` の中で実行中の DB 書き込みが途中で巻き戻されるわけではありません。
+キャンセルされるのは「書き込みが終わったあとの続き(UI 更新)」です。
+
+### DbHelper の寿命はまだ Activity が管理している
+
+`TodoDbHelper` は Activity ごとに作られ、`onDestroy` で `close()` しています。Step 0 と同じく、
+close と実行中の DB アクセスが競合する可能性は残っています。
+Step 2 で Repository をアプリ全体で 1 つにすると、DbHelper もアプリの寿命と一致し、この問題は消えます。
 
 ### インターフェースにした理由
 
@@ -57,9 +67,10 @@ Step 0 の「destroy 後に `runOnUiThread` が走る」問題はこれで消え
 
 ## まだ残っている課題
 
+- ① Adapter はまだ Activity の inner class で、Activity のフィールドを直接触っている
 - ③ `todos` は Activity のフィールドのまま。回転するとまた読み直す
 - ④ 完了数の集計と空文字チェックは Activity のまま
-- ⑤ `SqliteTodoRepository(TodoDbHelper(applicationContext))` と Activity が組み立てている
+- ⑤ `SqliteTodoRepository(TodoDbHelper(applicationContext))` と Activity が組み立て、DbHelper の close も Activity がやっている
 - 書き込みのたびに `loadTodos()` を呼んでいる
 
 ## 確認方法

@@ -6,6 +6,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 
+/**
+ * 【Step 4 で新設】テスト用の Repository。Room の代わりにメモリ上のリストで動く。
+ *
+ * Step 0 ではこれが書けなかった: DB アクセスが Activity に直書きされていて、
+ * 差し替える「継ぎ目」が存在しなかったから。
+ * Step 1 で TodoRepository をインターフェースにした時点で、この Fake は書けるようになっていた。
+ */
 class FakeTodoRepository(
     initialTodos: List<Todo> = emptyList(),
 ) : TodoRepository {

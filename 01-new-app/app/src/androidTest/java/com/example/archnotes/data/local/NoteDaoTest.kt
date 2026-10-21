@@ -56,6 +56,15 @@ class NoteDaoTest {
     }
 
     @Test
+    fun getByRemoteId_findsRowByServerId() = runTest {
+        val id = dao.upsert(NoteEntity(remoteId = "srv-1", title = "server", body = "", updatedAt = 1))
+        dao.upsert(NoteEntity(title = "local", body = "", updatedAt = 2))
+
+        assertEquals(id, dao.getByRemoteId("srv-1")?.id)
+        assertNull(dao.getByRemoteId("srv-999"))
+    }
+
+    @Test
     fun deleteById_removesRow() = runTest {
         val id = dao.upsert(NoteEntity(title = "x", body = "", updatedAt = 1))
 

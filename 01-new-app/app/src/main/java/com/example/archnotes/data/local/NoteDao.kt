@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.Flow
  *
  * - 戻り値を [Flow] にすると、テーブルが変わるたびに Room が自動で再クエリして流してくれる。
  *   これが「データの変化を UI まで自動で伝える」仕組みの出発点。
- * - 書き込みは suspend 関数にする。Room が自動でバックグラウンドスレッドで実行する。
+ * - 書き込みは suspend 関数にする。Room が自動でバックグラウンドスレッドで実行する(main-safe)。
  */
 @Dao
 interface NoteDao {
@@ -21,7 +21,17 @@ interface NoteDao {
     @Query("SELECT * FROM notes WHERE id = :id")
     fun observeById(id: Long): Flow<NoteEntity?>
 
-    /** 主キーが未採番(0)なら INSERT、既存なら UPDATE。戻り値は採番された行 ID。 */
+    @Query("SELECT * FROM notes WHERE id = :id")
+    suspend fun getById(id: Long): NoteEntity?
+
+    @Query("SELECT * FROM notes WHERE remote_id = :remoteId")
+    suspend fun getByRemoteId(remoteId: String): NoteEntity?
+
+    /**
+     * 主キーが未採番(0)なら INSERT、既存なら UPDATE。
+     * 戻り値は INSERT のときだけ採番された行 ID で、UPDATE のときは -1(Room の仕様)。
+     * 「保存後の ID」が欲しい呼び出し側のために、この違いは Repository が吸収する。
+     */
     @Upsert
     suspend fun upsert(note: NoteEntity): Long
 

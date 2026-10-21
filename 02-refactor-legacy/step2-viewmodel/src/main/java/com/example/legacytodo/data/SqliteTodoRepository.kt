@@ -6,6 +6,19 @@ import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/**
+ * 【Step 1 で新設】Step 0 の MainActivity に散らばっていた DB アクセスを、
+ * ほぼそのままここへ移した。
+ *
+ * 変えたこと:
+ * - `Thread { }` + `runOnUiThread { }` → `withContext(Dispatchers.IO)`。
+ *   呼び出し側は結果を「戻り値」として受け取れるので、コールバック地獄が消える。
+ * - DB アクセスが Activity のライフサイクルと無関係になった。
+ *
+ * 変えていないこと:
+ * - SQL も SQLiteOpenHelper もそのまま。「場所を変える」のが今回の目的で、
+ *   「仕組みを変える」(Room 化)は Step 3 でやる。
+ */
 class SqliteTodoRepository(
     private val dbHelper: TodoDbHelper,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,

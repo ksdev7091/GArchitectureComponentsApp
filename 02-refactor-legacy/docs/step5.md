@@ -12,15 +12,17 @@
 ```
 step5-compose/src/
 ├── main/java/com/example/legacytodo/
-│   ├── MainActivity.kt           ComponentActivity + setContent { TodoScreen() }(15 行)
+│   ├── MainActivity.kt           ComponentActivity + setContent { TodoScreen() }(コード部分は 10 行ほど)
 │   ├── ui/TodoScreen.kt          ★新設: activity_main.xml + item_todo.xml + TodoAdapter + render() の代わり
-│   ├── ui/TodoViewModel.kt       ★無変更
-│   ├── data/, di/, model/        ★無変更
+│   ├── ui/TodoViewModel.kt       ★無変更(Step 4 のファイルをそのままコピー)
+│   ├── data/, di/, model/        ★無変更(同上)
 │   └── res/layout/               ★削除
 └── test/                         ★無変更(そのまま通る)
 ```
 
 依存関係では `appcompat` と `activity-ktx` が消え、Compose 関連が入りました。
+テーマも AppCompat のものから `android:Theme.Material.Light.NoActionBar` に変わるため、Step 0〜4 にあった
+アクションバー(アプリ名の帯)は表示されなくなります。必要なら Compose の `TopAppBar` を置きます。
 
 ## なぜ ViewModel を触らずに済むのか
 
@@ -32,8 +34,8 @@ Step 2 で `TodoUiState` を設計したとき、**UI 技術に依存するも�
 |---|---|---|
 | 状態の購読 | `repeatOnLifecycle(STARTED) { uiState.collect { render(it) } }` | `uiState.collectAsStateWithLifecycle()` |
 | 一覧の描画 | `adapter.submit(state.todos)` | `LazyColumn { items(uiState.todos) { ... } }` |
-| 集計の表示 | `summaryText.text = getString(..., state.totalCount, state.doneCount)` | `Text(stringResource(..., uiState.totalCount, uiState.doneCount))` |
-| エラー表示 | `Toast` + `errorMessageShown()` | `SnackbarHost` + `LaunchedEffect` + `onErrorShown()` |
+| 集計の表示 | `summaryText.text = if (state.isLoading) ... else getString(...)` | `Text(if (uiState.isLoading) ... else stringResource(...))` |
+| エラー表示 | `Toast` + `errorMessageShown()` | `onErrorShown()` + `SnackbarHost`(画面スコープで表示) |
 | イベント | `viewModel.addTodo(input.text.toString())` | `onAdd(inputText)` |
 
 右の列は左の列を Compose で書き直しただけで、ViewModel の API は 1 つも変わっていません。
@@ -49,13 +51,19 @@ Step 2 で `TodoUiState` を設計したとき、**UI 技術に依存するも�
 ### 入力中のテキストは UI 側に置いた
 
 `var inputText by rememberSaveable { mutableStateOf("") }` と、Composable の中で持っています。
-「入力中の文字列」は業務ロジックに関係しない UI 要素の状態なので、ViewModel に上げる必要がありません。
-`rememberSaveable` にしておけば画面回転でも消えません。
-一方「空文字は追加できない」という業務ルールは ViewModel にあります。この線引きが [docs/02-layers.md](../../docs/02-layers.md) の「状態ホルダーの種類」です。
+この画面の入力文字列は、追加ボタンでイベントの引数として一度 ViewModel に渡すだけで、ViewModel が保持する必要がありません。
+そういう状態は UI 側に置いてよく、`rememberSaveable` にしておけば画面回転でもプロセス再生成でも消えません。
+一方「空文字は追加できない」という業務ルールは ViewModel にあります。
+ViewModel の処理が入力値を必要とする場合(01-new-app の編集画面)は ViewModel 側に置きます。
+この線引きは [docs/02-layers.md](../../docs/02-layers.md) の UI 層ルール 6 にまとめてあります。
 
-### エラー表示は `LaunchedEffect(messageRes)`
+### エラー表示は「受け取ったらすぐ消してもらう」
 
-`uiState.errorMessageRes` が非 null になったら Snackbar を出し、出し終えたら `onErrorShown()` で消してもらう。
+`uiState.errorMessageRes` が非 null になったら、まず `onErrorShown()` で ViewModel の状態を消し、
+それから画面のスコープで Snackbar を表示します(`LaunchedEffect` + `rememberCoroutineScope`)。
+Snackbar が消えるまで状態を残しておくと、その間に回転すると再表示され、同じエラーをもう一度起こしても
+StateFlow が同じ値を流さないので表示されない、という 2 つの問題が起きます。
+Step 2〜4 の Toast は表示と同時に状態を消していたので、Compose でも同じタイミングにそろえています。
 Step 2 で「イベントも状態として表す」と決めたので、Compose でも同じ考え方で扱えます。
 
 ## ここまでの到達点

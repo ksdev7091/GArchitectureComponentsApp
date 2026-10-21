@@ -11,6 +11,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
+/**
+ * 【Step 4 で新設】Room のようにビルダーで作るものは `@Provides` で作り方を教える。
+ * Step 3 の AppContainer の `Room.databaseBuilder(...)` がそのまま移ってきた。
+ */
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {

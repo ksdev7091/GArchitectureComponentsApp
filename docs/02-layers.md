@@ -27,19 +27,28 @@ UI 層は 2 種類の部品でできています。
    Compose なら `collectAsStateWithLifecycle()`、View なら `repeatOnLifecycle(STARTED)` で、画面が見えている間だけ購読する。
    → [NotesScreen](../01-new-app/app/src/main/java/com/example/archnotes/ui/notes/NotesScreen.kt), [Step 2 の MainActivity](../02-refactor-legacy/step2-viewmodel/src/main/java/com/example/legacytodo/MainActivity.kt)
 4. **一度きりの通知(Snackbar、画面遷移)も状態で表す**
-   「表示すべきメッセージがある」という状態を持ち、UI が表示し終えたら `userMessageShown()` で消してもらう。
-   イベント用の別チャネル(SharedFlow など)を使うと、購読が切れている瞬間のイベントを取りこぼす。
+   「表示すべきメッセージがある」という状態を持ち、UI が受け取ったら `userMessageShown()` で消してもらう。
+   SharedFlow や Channel で「イベント」として別に流す設計は、配信と処理が保証されない
+   (購読していない瞬間に失われる、UI が処理できない状態のときに届く)ため、公式に非推奨になった。
+   `isSaved` のように画面が閉じて ViewModel ごと破棄される状態は、消してもらう呼び出しが不要。
    → `NotesViewModel.userMessageShown()`, `NoteEditorUiState.isSaved`
 5. **Composable は「状態あり版」と「状態なし版」に分ける(状態ホイスティング)**
    状態あり版は ViewModel とつなぐだけ。状態なし版は引数の UiState を描くだけ。
    状態なし版は Preview とテストで任意の状態を直接渡せる。
    → [NotesScreen.kt](../01-new-app/app/src/main/java/com/example/archnotes/ui/notes/NotesScreen.kt) の 2 つの `NotesScreen` 関数
-6. **入力途中のテキストのような「失うと困る軽い状態」は SavedStateHandle に置く**
-   ViewModel はプロセスが kill されると消えるが、SavedStateHandle は復元される。
+6. **入力途中のテキストは、置き場所を 2 つの基準で決める**
+   - ViewModel の処理(保存など)がその値を必要とする → ViewModel に置き、`savedStateHandle.saveable` で
+     プロセス再生成を生き延びさせる(01 の編集画面)。このとき StateFlow ではなく
+     スナップショット状態(`mutableStateOf`)にする。TextField は入力が同期的に反映されることを前提に
+     しており、StateFlow を経由すると速い入力や日本語変換中に文字が欠けることがある。
+   - イベントの引数として一度渡すだけで ViewModel が保持しない → Composable の `rememberSaveable`(02 Step 5 の追加欄)。
+   どちらも回転とプロセス再生成を生き延びる。SavedStateHandle は Bundle に入るので、置く状態は小さく保つ。
    → [NoteEditorViewModel](../01-new-app/app/src/main/java/com/example/archnotes/ui/editor/NoteEditorViewModel.kt)
 7. **画面(Screen)は遷移先を知らない**
    `onNoteClick: (Long) -> Unit` のようなコールバックを受け取り、実際の遷移は NavHost が決める。
-   → [ArchNotesNavHost](../01-new-app/app/src/main/java/com/example/archnotes/ui/navigation/ArchNotesNavHost.kt)
+   ルート定義と NavGraph への登録関数は画面側のパッケージに置き、NavHost がそれに依存する(逆は不可)。
+   → [ArchNotesNavHost](../01-new-app/app/src/main/java/com/example/archnotes/ui/ArchNotesNavHost.kt),
+     [NoteEditorNavigation](../01-new-app/app/src/main/java/com/example/archnotes/ui/editor/NoteEditorNavigation.kt)
 
 ### 状態ホルダーの種類
 
@@ -86,19 +95,23 @@ Data 層は 2 種類の部品でできています。
    → [Step 3 の変更点](../02-refactor-legacy/docs/step3.md) がこの効果を実感できる
 3. **main-safe にする**
    Repository の関数はメインスレッドから呼んでも安全でなければならない。スレッドの切り替えは Repository か DataSource の責任。
-   Room と Retrofit の suspend 関数はもともと main-safe。自前の重い処理は `withContext(ioDispatcher)` で逃がす。
-   → `OfflineFirstNotesRepository.refresh()`
+   Room と Retrofit の suspend 関数はもともと main-safe なので、それらを呼ぶだけの Repository に `withContext` は要らない。
+   ブロッキングな API を使うなら、それを包む DataSource の中で `withContext(Dispatchers.IO)` を書き、上の層には漏らさない。
+   → [OfflineFirstNotesRepository](../01-new-app/app/src/main/java/com/example/archnotes/data/OfflineFirstNotesRepository.kt) のクラスコメント
 4. **SSOT を決める**
    オフライン対応するなら Room を SSOT にし、サーバーの応答は一度 Room に書いてから UI に届ける(オフラインファースト)。
 5. **層ごとにモデルを分ける**
    DB の行(`NoteEntity`)、API の応答(`NetworkNote`)、アプリのモデル(`Note`)は別のクラスにし、Data 層の中で変換する。
    DB のカラム名を変えても UI 層が影響を受けない。
-   → [NoteEntity.kt](../01-new-app/app/src/main/java/com/example/archnotes/data/local/NoteEntity.kt) の `asModel()` / `asEntity()`
+   サーバー側の ID とローカル DB の自動採番 ID は別のカラムに持つ。1 つの列に混ぜると衝突してユーザーのデータが黙って上書きされる。
+   → [NoteEntity.kt](../01-new-app/app/src/main/java/com/example/archnotes/data/local/NoteEntity.kt) の `remoteId` と `asModel()` / `asEntity()`
 6. **DataSource は Repository 以外から呼ばない**
    ViewModel が DAO を直接触り始めると、Repository の存在意義(SSOT、キャッシュ戦略)が崩れる。
 7. **エラーは例外で投げ、ViewModel が状態に変換する**
-   Repository は `IOException` を投げる。ViewModel が catch して `userMessageRes` にする。
-   `Result` 型を使う流儀もあるが、どちらにせよ「UI まで例外を素通しにしない」のが要点。
+   DataSource は「通信失敗は `IOException`」のような契約を決め、実装固有の例外(Retrofit の `HttpException` など)は
+   DataSource の中で契約の例外に変換する。ViewModel はその契約に合わせて catch し、`userMessageRes` のような状態にする。
+   `Result` 型を使う流儀もあるが、どちらにせよ「UI まで例外を素通しにしない」「実装を替えても catch 節が変わらない」のが要点。
+   → [NoteRemoteDataSource](../01-new-app/app/src/main/java/com/example/archnotes/data/remote/NoteRemoteDataSource.kt) のクラスコメント
 
 ## 依存性の注入 (DI) — 層をつなぐ接着剤
 

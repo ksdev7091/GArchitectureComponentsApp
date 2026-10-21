@@ -33,7 +33,7 @@ android {
 }
 
 dependencies {
-    // 昔ながらの構成: AppCompat だけ。Coroutines も ViewModel も使っていない。
+    // 昔ながらの構成: AppCompat と core-ktx だけ。Coroutines も ViewModel も使っていない。
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
 }

@@ -25,11 +25,12 @@ data class TodoUiState(
 }
 
 /**
- * 【Step 5: Compose 化】ViewModel は Step 4 から **1 文字も変わっていない**。
+ * 【Step 4 で変更】`@HiltViewModel` + `@Inject constructor` にして、手書きの Factory を削除した。
  *
- * View(XML) から Compose へ UI の作り方が丸ごと変わっても、状態ホルダーには影響しない。
- * UiState と ViewModel を「UI 技術に依存しない形」で設計しておいた見返り。
- * 単体テスト(src/test)もそのまま通る。
+ * ロジックは Step 3 から変わっていない。
+ * そして `TodoRepository` をインターフェースで受け取っているので、
+ * テストでは [FakeTodoRepository](src/test) を渡して JVM 上で検証できる。
+ * → `src/test/java/com/example/legacytodo/ui/TodoViewModelTest.kt`
  */
 @HiltViewModel
 class TodoViewModel @Inject constructor(

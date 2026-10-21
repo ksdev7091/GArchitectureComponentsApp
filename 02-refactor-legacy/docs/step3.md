@@ -12,7 +12,7 @@
 
 ```
 step3-room-flow/src/main/java/com/example/legacytodo/
-├── MainActivity.kt               ★無変更(Step 2 と 1 行も違わない)
+├── MainActivity.kt               ★無変更(Step 2 のファイルをそのままコピー。Compare Files で差分ゼロ)
 ├── TodoApplication.kt            AppContainer が Room を組み立てるように
 ├── model/Todo.kt
 ├── data/
@@ -73,7 +73,7 @@ DB のカラム名を変えても、UI 層と ViewModel は影響を受けませ
 
 ## 実務での注意: 既存 DB の移行
 
-このリポジトリでは Step 3 は別アプリ(`applicationId` が違う)なので、Step 2 までの `todo.db` とは無関係に `todo_room.db` を新規作成しています。
+このリポジトリでは各ステップが別アプリ(`applicationId` が違う)なので、Step 3 は Step 2 の `todo.db` とは無関係に `todo_room.db` を新規作成しています。
 本番アプリで同じことをする場合、Room は既存テーブルのスキーマを検証するため、同じ DB ファイルを引き継ぐなら `Migration` を書くか、旧テーブルから新テーブルへデータをコピーする処理が必要です。
 
 ## まだ残っている課題

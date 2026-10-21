@@ -1,11 +1,15 @@
 package com.example.archnotes.ui.editor
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.lifecycle.viewmodel.compose.SavedStateHandleSaveableApi
+import androidx.lifecycle.viewmodel.compose.saveable
 import com.example.archnotes.data.NotesRepository
 import com.example.archnotes.model.Note
-import com.example.archnotes.ui.navigation.NoteEditorRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,17 +20,14 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+/** 編集画面の状態のうち、テキスト以外。テキストは [NoteEditorViewModel.title] / [NoteEditorViewModel.body]。 */
 data class NoteEditorUiState(
-    val title: String = "",
-    val body: String = "",
     val isNew: Boolean = true,
     val isLoading: Boolean = false,
+    val isSaving: Boolean = false,
     /** 保存が完了したら true。UI はこれを見て前の画面に戻る。 */
     val isSaved: Boolean = false,
-) {
-    /** 「保存できるか」は title から導出できるので、別のフィールドにせずプロパティで計算する。 */
-    val canSave: Boolean get() = title.isNotBlank() && !isLoading && !isSaved
-}
+)
 
 /**
  * 編集画面の ViewModel。
@@ -34,12 +35,19 @@ data class NoteEditorUiState(
  * ここで学べるポイント:
  * 1. **画面引数の受け取り**: Navigation が渡した引数を [SavedStateHandle] から取り出す。
  *    Activity/Fragment の Intent や Bundle を ViewModel が触らないので、JVM だけでテストできる。
- * 2. **入力途中のテキストの保存**: `title` / `body` は [SavedStateHandle] に置く。
- *    ViewModel はプロセスが OS に kill されると消えるが、SavedStateHandle の中身は復元される。
- *    「入力途中の内容」のような、失うとユーザーが困る軽い状態はここに置く。
+ * 2. **入力中のテキストの持ち方**: [title] / [body] は StateFlow ではなく
+ *    Compose のスナップショット状態(`mutableStateOf`)で持つ。
+ *    TextField は「入力 → onValueChange → 新しい value」が同期的に反映されることを前提にしており、
+ *    StateFlow → collect → 再コンポーズという非同期の経路を挟むと、速い入力や日本語の変換中に
+ *    文字が欠ける・重複することがある(Compose 公式の TextField ガイダンス)。
+ *    `savedStateHandle.saveable` で包んでおけば、プロセス再生成後も復元される
+ *    (SavedStateHandle は Bundle に入るので、ここに置く状態は小さく保つ)。
  * 3. **ロードは一度だけ**: 既存メモを開いたとき、Repository から読み込むのは最初の一度だけ。
- *    プロセス再生成後に再ロードすると、ユーザーの編集内容を上書きしてしまうため。
+ *    プロセス再生成後に再ロードすると、ユーザーの編集内容を上書きしてしまうため、
+ *    「ロード済み」フラグも SavedStateHandle に残す。
+ * 4. **二重保存の防止**: 保存ボタンの連打で同じメモが 2 つできないよう、保存中フラグで弾く。
  */
+@OptIn(SavedStateHandleSaveableApi::class)
 @HiltViewModel
 class NoteEditorViewModel @Inject constructor(
     private val savedStateHandle: SavedStateHandle,
@@ -59,27 +67,32 @@ class NoteEditorViewModel @Inject constructor(
         savedStateHandle.get<Long>(NoteEditorRoute::noteId.name) ?: Note.NEW_NOTE_ID
     private val isNew: Boolean = noteId == Note.NEW_NOTE_ID
 
-    // SavedStateHandle をそのまま StateFlow として扱える
-    private val title = savedStateHandle.getStateFlow(KEY_TITLE, "")
-    private val body = savedStateHandle.getStateFlow(KEY_BODY, "")
+    // ---- テキスト: スナップショット状態 + SavedStateHandle(プロセス再生成を生き延びる) ----
+
+    var title: String by savedStateHandle.saveable { mutableStateOf("") }
+        private set
+
+    var body: String by savedStateHandle.saveable { mutableStateOf("") }
+        private set
+
+    // ---- テキスト以外: StateFlow ----
 
     private val isLoading = MutableStateFlow(!isNew && !savedStateHandle.contains(KEY_LOADED))
+    private val isSaving = MutableStateFlow(false)
     private val isSaved = MutableStateFlow(false)
 
     val uiState: StateFlow<NoteEditorUiState> =
-        combine(title, body, isLoading, isSaved) { title, body, loading, saved ->
-            NoteEditorUiState(
-                title = title,
-                body = body,
-                isNew = isNew,
-                isLoading = loading,
-                isSaved = saved,
-            )
+        combine(isLoading, isSaving, isSaved) { loading, saving, saved ->
+            NoteEditorUiState(isNew = isNew, isLoading = loading, isSaving = saving, isSaved = saved)
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = NoteEditorUiState(isNew = isNew, isLoading = isLoading.value),
         )
+
+    /** 保存できるか。導出できる値なので別の状態として持たず、元の状態から計算する。 */
+    val canSave: Boolean
+        get() = title.isNotBlank() && !isLoading.value && !isSaving.value && !isSaved.value
 
     init {
         if (isLoading.value) {
@@ -90,40 +103,47 @@ class NoteEditorViewModel @Inject constructor(
     private fun loadExistingNote() {
         viewModelScope.launch {
             val note = notesRepository.observeNote(noteId).first()
-            savedStateHandle[KEY_TITLE] = note?.title.orEmpty()
-            savedStateHandle[KEY_BODY] = note?.body.orEmpty()
+            // 他の画面で削除済みなど、存在しない ID なら空のまま編集を続ける
+            // (保存すると同じ ID で復活する。このアプリの遷移では起きない)
+            if (note != null) {
+                title = note.title
+                body = note.body
+            }
             savedStateHandle[KEY_LOADED] = true
             isLoading.value = false
         }
     }
 
     fun onTitleChange(value: String) {
-        savedStateHandle[KEY_TITLE] = value
+        title = value
     }
 
     fun onBodyChange(value: String) {
-        savedStateHandle[KEY_BODY] = value
+        body = value
     }
 
     fun save() {
-        val current = uiState.value
-        if (!current.canSave) return
+        if (!canSave) return
+        // launch の中で立てると、連打の 2 回目が先に通ることがあるので同期的に立てる
+        isSaving.value = true
         viewModelScope.launch {
-            notesRepository.saveNote(
-                Note(
-                    id = noteId,
-                    title = current.title.trim(),
-                    body = current.body,
-                    updatedAt = System.currentTimeMillis(),
-                ),
-            )
-            isSaved.value = true
+            try {
+                notesRepository.saveNote(
+                    Note(
+                        id = noteId,
+                        title = title.trim(),
+                        body = body,
+                        updatedAt = System.currentTimeMillis(),
+                    ),
+                )
+                isSaved.value = true
+            } finally {
+                isSaving.value = false
+            }
         }
     }
 
     private companion object {
-        const val KEY_TITLE = "title"
-        const val KEY_BODY = "body"
         const val KEY_LOADED = "loaded"
     }
 }

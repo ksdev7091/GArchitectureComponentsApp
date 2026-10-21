@@ -17,10 +17,11 @@
 | コンストラクタインジェクション | 依存をコンストラクタ引数で受け取る形 | `class NotesViewModel @Inject constructor(...)` |
 | Fake | テスト用に、インターフェースを本物らしく軽量に実装したもの | `FakeNotesRepository` |
 | 構成変更 (Configuration change) | 画面回転・言語変更などで Activity が破棄・再生成されること | ViewModel が生き残る理由 |
-| プロセス再生成 (Process death) | バックグラウンドのアプリの OS が kill し、復帰時に作り直されること | `SavedStateHandle` が必要な理由 |
-| `SavedStateHandle` | プロセス再生成を生き延びる小さな key-value ストア。ViewModel に注入される | `NoteEditorViewModel` の入力中テキスト |
+| プロセス再生成 (Process death) | バックグラウンドのアプリを OS が kill し、復帰時に作り直されること | `SavedStateHandle` が必要な理由 |
+| `SavedStateHandle` | プロセス再生成を生き延びる小さな key-value ストア。ViewModel に注入される | `NoteEditorViewModel` の入力中テキストと画面引数 |
+| スナップショット状態 (Snapshot state) | `mutableStateOf` で作る Compose の状態。読んだ Composable が変更時に自動で再コンポーズされる。TextField のテキストはこれで持つ | `NoteEditorViewModel.title` |
 | `StateFlow` | 常に最新値を 1 つ持つ Flow。UI 状態の公開に使う | `uiState: StateFlow<NotesUiState>` |
-| `stateIn` | 普通の Flow を StateFlow に変換する。`WhileSubscribed(5_000)` で購読者がいる間だけ上流を動かす | `NotesViewModel.uiState` |
+| `stateIn` | 普通の Flow を StateFlow に変換する。`WhileSubscribed(5_000)` なら購読者がいなくなって 5 秒経つと上流を止め、再購読で再開する | `NotesViewModel.uiState` |
 | `collectAsStateWithLifecycle` | Compose で StateFlow を購読する。画面が見えていない間は購読を止める | `NotesScreen` |
 | `repeatOnLifecycle` | View システムで Flow を購読する。指定の Lifecycle 状態の間だけ collect する | Step 2〜4 の `MainActivity` |
 | Entity / DTO / モデル | DB の行 / API の応答 / アプリ内部の表現。層ごとに分けて Data 層で変換する | `NoteEntity` / `NetworkNote` / `Note` |
