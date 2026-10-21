@@ -51,6 +51,7 @@ class OfflineFirstNotesRepositoryTest {
         repository.refresh()
 
         assertEquals(1, dao.currentRows.size)
+        assertEquals("先", dao.currentRows.single().title) // distinctBy は最初の 1 件を採用する
     }
 
     @Test
