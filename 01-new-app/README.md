@@ -5,8 +5,10 @@
 
 ## 画面
 
-- **一覧画面** (`NotesScreen`): 検索ボックス、メモのリスト、削除ボタン、右上の同期ボタン、右下の追加ボタン。
+- **一覧画面** (`NotesScreen`): 検索ボックス、メモのリスト、削除ボタン、右上の同期ボタンと設定ボタン、右下の追加ボタン。
 - **編集画面** (`NoteEditorScreen`): タイトルと本文。保存すると一覧へ戻ります。
+- **設定画面** (`SettingsScreen`): 並び順(更新順 / タイトル順)と本文プレビューの表示切替。DataStore に保存され、一覧に即時反映されます。
+  保存されているメモの件数も表示します(一覧画面と同じ Repository を見ている 2 つ目の画面)。
 
 ## 2 つの flavor: demo と prod
 
@@ -28,7 +30,8 @@ app/src/main/java/com/example/archnotes/
 ├── ArchNotesApplication.kt       @HiltAndroidApp
 ├── MainActivity.kt               Compose を立ち上げるだけ
 ├── model/
-│   └── Note.kt                   アプリ全体で使うモデル(層をまたぐ唯一のデータ型)
+│   ├── Note.kt                   アプリ全体で使うモデル(層をまたぐデータ型)
+│   └── UserPreferences.kt        ユーザー設定(並び順、本文プレビュー)
 ├── ui/                           ── UI 層 ──
 │   ├── ArchNotesNavHost.kt       画面遷移。各画面の登録関数を呼ぶだけ
 │   ├── notes/
@@ -39,9 +42,13 @@ app/src/main/java/com/example/archnotes/
 │   │   ├── NoteEditorNavigation.kt  編集画面のルート、遷移関数、NavGraph 登録関数
 │   │   ├── NoteEditorViewModel.kt   SavedStateHandle、スナップショット状態、二重保存防止
 │   │   └── NoteEditorScreen.kt
+│   ├── settings/
+│   │   ├── SettingsNavigation.kt
+│   │   ├── SettingsViewModel.kt  設定 Repository とメモ Repository の両方を購読する 2 つ目の画面
+│   │   └── SettingsScreen.kt
 │   └── theme/Theme.kt
 ├── domain/                       ── Domain 層(省略可) ──
-│   └── GetNotesUseCase.kt        検索語でフィルタする
+│   └── GetNotesUseCase.kt        メモ Repository と設定 Repository を combine し、検索 → 並び替え
 └── data/                         ── Data 層 ──
     ├── NotesRepository.kt        公開 API(インターフェース)
     ├── OfflineFirstNotesRepository.kt   Room を SSOT とする実装
@@ -51,12 +58,15 @@ app/src/main/java/com/example/archnotes/
     │   ├── NotesApi.kt                  Retrofit の API 定義
     │   ├── RetrofitNoteRemoteDataSource.kt  本物の HTTP。実装固有の例外を契約の例外に変換する
     │   └── FakeNoteRemoteDataSource.kt  疑似リモート
-    └── di/                       Hilt モジュール: DataModule(Repository)、DatabaseModule(Room)、NetworkModule(Retrofit)
+    ├── preferences/
+    │   ├── UserPreferencesRepository.kt         設定の公開 API(Flow で読み、suspend で書く)
+    │   └── DataStoreUserPreferencesRepository.kt  Jetpack DataStore による実装
+    └── di/                       Hilt モジュール: DataModule(Repository)、DatabaseModule(Room)、NetworkModule(Retrofit)、PreferencesModule(DataStore)
 app/src/demo/java/.../data/di/RemoteModule.kt   demo: Fake を選ぶ
 app/src/prod/java/.../data/di/RemoteModule.kt   prod: Retrofit を選ぶ
 
-app/src/test/        JVM 単体テスト 25 件(ViewModel × 2, UseCase, Repository, Retrofit + MockWebServer)と Fake / テストルール
-app/src/androidTest/ Room DAO の Instrumented Test
+app/src/test/        JVM 単体テスト 30 件(ViewModel × 3, UseCase, Repository, Retrofit + MockWebServer)と Fake / テストルール
+app/src/androidTest/ Instrumented Test: Room DAO、状態なし Composable の UI テスト、Hilt でリモートを差し替えた E2E テスト
 docs/                演習問題(exercises.md)と解答例(answers.md)
 ```
 
@@ -76,17 +86,31 @@ UI 層が Data 層を直接使うのは許されています(`NotesViewModel` �
 5. `data/remote/` — DTO(`@SerialName`、省略可能なフィールド)、Retrofit の API 定義、
    `RetrofitNoteRemoteDataSource` が `HttpException` / `SerializationException` を `IOException` に変換する理由。
    `src/demo` と `src/prod` の `RemoteModule` を見比べ、差し替えが 1 行で済むことを確認する。
-6. `domain/GetNotesUseCase.kt` — Domain 層の形と、置く/置かないの判断。
-7. `ui/notes/NotesViewModel.kt` — 複数の StateFlow を `combine` して 1 つの UiState にする。例外を状態に変換する。
-8. `ui/notes/NotesScreen.kt` — 状態あり版と状態なし版。「一度きりの通知」の扱い(受け取ったらすぐ消してもらう)。
-9. `ui/editor/NoteEditorViewModel.kt` — 画面引数、入力テキストをスナップショット状態 + `savedStateHandle.saveable` で持つ理由、
-   プロセス再生成後にユーザーの編集を上書きしない工夫、保存ボタン連打の防止。
-   「保存できるか」をスナップショット状態と StateFlow の両方から導く値として画面側で計算している理由。
-10. `ui/notes/NotesNavigation.kt`、`ui/editor/NoteEditorNavigation.kt`、`ui/ArchNotesNavHost.kt` — ルートを画面側に置く理由。
+6. `data/preferences/` — DataStore を Repository の裏に隠す。SharedPreferences との違い(Flow で届く、suspend で書く)。
+7. `domain/GetNotesUseCase.kt` — 2 つの Repository(メモと設定)を `combine` する、Domain 層の本来の出番。置く/置かないの判断。
+8. `ui/notes/NotesViewModel.kt` — 複数の StateFlow を `combine` して 1 つの UiState にする。例外を状態に変換する。
+9. `ui/settings/SettingsViewModel.kt` — 一覧と同じ Repository を購読する 2 つ目の画面。画面間で値を受け渡すコードが無いことを確認する。
+10. `ui/notes/NotesScreen.kt` — 状態あり版と状態なし版。「一度きりの通知」の扱い(受け取ったらすぐ消してもらう)。
+11. `ui/editor/NoteEditorViewModel.kt` — 画面引数、入力テキストをスナップショット状態 + `savedStateHandle.saveable` で持つ理由、
+    プロセス再生成後にユーザーの編集を上書きしない工夫、保存ボタン連打の防止。
+    「保存できるか」をスナップショット状態と StateFlow の両方から導く値として画面側で計算している理由。
+12. `ui/notes/NotesNavigation.kt`、`ui/editor/NoteEditorNavigation.kt`、`ui/ArchNotesNavHost.kt` — ルートを画面側に置く理由。
     行の連打で画面が 2 枚積まれないよう、遷移元が RESUMED のときだけ遷移する仕組み。
-11. `data/di/` — Hilt モジュール。`NetworkModule` の組み立てと、テストで同じ組み立てを MockWebServer に向けてやり直す対応関係。
-12. `src/test/` — ViewModel、Repository、ネットワーク層が JVM だけでテストできることを確認。
-13. [docs/exercises.md](docs/exercises.md) — 機能を足す演習で、各層をどう通すかを手に入れる。
+13. `data/di/` — Hilt モジュール。`NetworkModule` の組み立てと、テストで同じ組み立てを MockWebServer に向けてやり直す対応関係。
+14. `src/test/` — ViewModel、UseCase、Repository、ネットワーク層が JVM だけでテストできることを確認。
+15. `src/androidTest/` — 状態なし Composable の UI テスト(`NotesScreenTest`)と、`@TestInstallIn` でリモートを差し替えた
+    E2E テスト(`SyncFlowTest`)。本番コードを変えずに「ネットワークの向こう側」だけを差し替える仕組み。
+16. [docs/exercises.md](docs/exercises.md) — 機能を足す演習で、各層をどう通すかを手に入れる。
+
+## データの流れを追う: 設定画面で並び順を変えたとき
+
+1. `SettingsScreen` の `RadioButton` → `onSortOrderChange(TITLE_ASC)` → `SettingsViewModel.setSortOrder()`
+2. `UserPreferencesRepository.setSortOrder()` → DataStore に書き込み
+3. DataStore の `data` Flow が新しい設定を流す → `SettingsViewModel` の `combine` → 設定画面のラジオが切り替わる
+4. **同じ Flow を** `GetNotesUseCase` も購読している → `combine(notes, preferences)` が並び替え直す → `NotesViewModel` → 一覧画面が並び替わる
+
+設定画面は一覧画面を知らず、一覧画面も設定画面を知りません。
+どちらも Data 層の同じ Flow を見ているだけで、画面間で値を受け渡すコードは存在しません。これが SSOT の効果です。
 
 ## データの流れを追う: 検索語を 1 文字入力したとき
 
@@ -129,6 +153,16 @@ UI が関わるのは 1 と 8 だけ。「何件に絞られるか」を UI は�
 - `OfflineFirstNotesRepositoryTest`: 「再同期しても重複しない」「ローカルのメモが消えない」「remoteId を失わない」を検証している。
 - `RetrofitNoteRemoteDataSourceTest`: MockWebServer をローカルの HTTP サーバーとして立て、
   JSON の解釈(snake_case、未知のキー、省略フィールド)と、HTTP エラー・壊れた JSON・接続失敗がすべて `IOException` になることを検証している。
+- `GetNotesUseCaseTest` / `SettingsViewModelTest`: 設定の Fake(`FakeUserPreferencesRepository`)を差し込み、並び順の切替が Flow で伝わることを検証している。
+
+## Instrumented Test の読み方(端末 / エミュレータで実行: `./gradlew connectedDemoDebugAndroidTest`)
+
+- `NotesScreenTest` / `NoteEditorScreenTest`: 状態なし版の Composable に任意の UiState を渡し、「空のときの文言」「同期中はボタンが無効」
+  「削除ボタンで ID 付きのコールバックが呼ばれる」などを検証する。ViewModel も Hilt も Room も関与しない。
+- `SyncFlowTest`: `@HiltAndroidTest` で本物の `MainActivity` を起動し、同期ボタンを押して一覧にメモが出るまでを検証する。
+  `TestRemoteModule` が `@TestInstallIn(replaces = [RemoteModule::class])` でリモートだけを差し替えるので、
+  Room と DataStore は本物のまま、結果は決定的で速い。`HiltTestRunner` がテスト用の Application を立ち上げる。
+- `NoteDaoTest`: インメモリ Room で DAO の SQL を検証する。
 
 ## 実機で確認済みの挙動(Android 16)
 
@@ -146,6 +180,7 @@ UI が関わるのは 1 と 8 だけ。「何件に絞られるか」を UI は�
 - ダークモードで表示が崩れない
 - 本文に長文を入れてもキーボードの下に隠れない(`imePadding`。edge-to-edge ではアプリが IME のインセットを扱う)
 - prod: サーバーのメモを編集して再同期すると、サーバーの内容に戻る(「サーバーが正」)。削除しても再同期で戻る。重複しない
+- 設定画面で並び順を変えると、戻った一覧が並び替わっている。本文プレビューを切ると一覧から本文が消える
 
 ## 本物のアプリにするとき
 

@@ -9,15 +9,15 @@ README の「読む順番」と「データの流れを追う」を終えてか�
 
 ---
 
-## 1 ★★ 並び順の切り替え(UI 層 + Domain 層)
+## 1 ★★ 設定を 1 つ増やす(Data 層 → Domain 層 → 2 つの画面)
 
-一覧画面に「更新順 / タイトル順」を切り替えるボタンを追加してください。条件:
-- `NotesUiState` に `sortOrder: SortOrder`(enum)を持つ。
-- 並び替えは `GetNotesUseCase` の責任にする(引数を増やすか、新しい UseCase を作るか、理由を付けて選ぶ)。
-- 画面回転で並び順が戻らない。
-- `NotesViewModelTest` にテストを 1 つ追加する。
+設定画面に「文字サイズ(小 / 中 / 大)」を追加し、一覧画面と編集画面の両方の文字サイズに反映してください。条件:
+- `UserPreferences` に `textScale`(enum)を追加し、`DataStoreUserPreferencesRepository` で保存・読み出しする。
+- `SettingsScreen` にラジオボタンを追加する(既存の並び順と同じ作り)。
+- 一覧画面と編集画面は、それぞれの UiState(または ViewModel)経由で値を受け取り、`MaterialTheme.typography` を拡大して描く。
+- `FakeUserPreferencesRepository` を更新し、`SettingsViewModelTest` にテストを 1 つ追加する。
 
-考えてほしいこと: 並び替えを DAO の SQL でやる案との比較(3-2 の 02 版と同じ論点)。
+考えてほしいこと: 文字サイズは Domain 層(UseCase)を通すべきか。並び順が `GetNotesUseCase` を通っているのとは何が違うか。
 
 ## 2 ★★★ 「ピン留め」フィールドを追加する(Data 層からの一気通貫)
 
@@ -56,11 +56,13 @@ README の「読む順番」と「データの流れを追う」を終えてか�
 どのテストが、どの例外で落ちますか。その例外が本番アプリで起きたら、`NotesViewModel.refresh()` はどうなりますか。
 確認したら元に戻してください。
 
-## 6 ★★★ Hilt のテストで RemoteModule を差し替える(発展・Instrumented Test)
+## 6 ★★★ E2E テストを 1 本増やす(Instrumented Test)
 
-`androidTest` に、`@TestInstallIn(components = [SingletonComponent::class], replaces = [RemoteModule::class])` で
-`NoteRemoteDataSource` をテスト用の実装に差し替え、`MainActivity` を起動して同期ボタンを押すと
-テスト用のメモが一覧に出ることを Compose UI テストで検証してください。
+`src/androidTest` の `SyncFlowTest` は `TestRemoteModule` でリモートを差し替え、同期ボタン → 一覧にメモが出るまでを検証しています。
+同じ仕組みで、次の流れを検証する E2E テストを書いてください。
+- 追加ボタン → 編集画面でタイトルを入力 → 保存 → 一覧に表示される → 設定画面で「本文プレビュー」をオフ → 戻ると本文が消えている
 
-必要な依存: `hilt-android-testing`、`androidx.compose.ui:ui-test-junit4`、カスタム `HiltTestRunner`。
-これはこのキットの範囲を少し超えますが、「本番コードを変えずにテストで差し替える」の最終形です。
+考えてほしいこと:
+- 設定の DataStore は本物が動くので、テスト間で設定が残る。`@Before` でどう初期化するか(ヒント: `PreferencesModule` も `@TestInstallIn` で差し替え、
+  テストごとに別ファイル名にするか、`dataStore.edit { it.clear() }` を呼ぶ)。
+- `SyncFlowTest` の `waitUntil` のような「非同期の完了待ち」をどこに置くか。

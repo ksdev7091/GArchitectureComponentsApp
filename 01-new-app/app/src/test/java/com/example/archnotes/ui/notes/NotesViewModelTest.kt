@@ -3,7 +3,9 @@ package com.example.archnotes.ui.notes
 import com.example.archnotes.R
 import com.example.archnotes.domain.GetNotesUseCase
 import com.example.archnotes.model.Note
+import com.example.archnotes.model.UserPreferences
 import com.example.archnotes.testing.FakeNotesRepository
+import com.example.archnotes.testing.FakeUserPreferencesRepository
 import com.example.archnotes.testing.MainDispatcherRule
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -38,8 +40,14 @@ class NotesViewModelTest {
     private fun note(id: Long, title: String, body: String = "") =
         Note(id = id, title = title, body = body, updatedAt = id)
 
-    private fun createViewModel(repository: FakeNotesRepository) =
-        NotesViewModel(getNotes = GetNotesUseCase(repository), notesRepository = repository)
+    private fun createViewModel(
+        repository: FakeNotesRepository,
+        preferences: FakeUserPreferencesRepository = FakeUserPreferencesRepository(),
+    ) = NotesViewModel(
+        getNotes = GetNotesUseCase(repository, preferences),
+        notesRepository = repository,
+        userPreferencesRepository = preferences,
+    )
 
     @Test
     fun `Repository のメモがそのまま uiState に反映され、読込中が解除される`() = runTest {
@@ -112,6 +120,19 @@ class NotesViewModelTest {
 
         viewModel.userMessageShown()
         assertNull(viewModel.uiState.value.userMessageRes)
+    }
+
+    @Test
+    fun `本文プレビューの設定が uiState に反映され、設定を変えると追従する`() = runTest {
+        val preferences = FakeUserPreferencesRepository(UserPreferences(showBodyPreview = false))
+        val viewModel = createViewModel(FakeNotesRepository(), preferences)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect() }
+
+        assertFalse(viewModel.uiState.value.showBodyPreview)
+
+        preferences.setShowBodyPreview(true) // 設定画面で変えた想定
+
+        assertTrue(viewModel.uiState.value.showBodyPreview)
     }
 
     @Test

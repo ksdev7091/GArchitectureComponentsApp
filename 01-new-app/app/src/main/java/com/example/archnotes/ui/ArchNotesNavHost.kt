@@ -7,12 +7,14 @@ import com.example.archnotes.ui.editor.navigateToNoteEditor
 import com.example.archnotes.ui.editor.noteEditorScreen
 import com.example.archnotes.ui.notes.NotesRoute
 import com.example.archnotes.ui.notes.notesScreen
+import com.example.archnotes.ui.settings.navigateToSettings
+import com.example.archnotes.ui.settings.settingsScreen
 
 /**
  * 画面遷移の定義。
  *
  * - 各画面の「住所」(ルート)と NavGraph への登録関数は、その画面のパッケージが持つ
- *   (`ui/notes/NotesNavigation.kt`, `ui/editor/NoteEditorNavigation.kt`)。
+ *   (`ui/notes/NotesNavigation.kt`, `ui/editor/NoteEditorNavigation.kt`, `ui/settings/SettingsNavigation.kt`)。
  *   NavHost は画面パッケージに依存するが、画面パッケージは NavHost を知らない。
  *   こうしておくと、後で画面ごとにモジュール分割しても依存の向きが崩れない。
  * - 各画面(Screen)は「どこへ遷移するか」を知らない。`onNoteClick` のようなコールバックを
@@ -26,9 +28,13 @@ fun ArchNotesNavHost() {
         notesScreen(
             onNoteClick = { noteId -> navController.navigateToNoteEditor(noteId) },
             onAddClick = { navController.navigateToNoteEditor() },
+            onSettingsClick = { navController.navigateToSettings() },
         )
         noteEditorScreen(
             onDone = { navController.popBackStack() },
+        )
+        settingsScreen(
+            onBack = { navController.popBackStack() },
         )
     }
 }

@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
@@ -56,6 +57,7 @@ import kotlinx.coroutines.launch
 fun NotesScreen(
     onNoteClick: (Long) -> Unit,
     onAddClick: () -> Unit,
+    onSettingsClick: () -> Unit,
     viewModel: NotesViewModel = hiltViewModel(),
 ) {
     // collectAsStateWithLifecycle: 画面がバックグラウンドにある間は購読を止める(リソース節約)
@@ -69,6 +71,7 @@ fun NotesScreen(
         onUserMessageShown = viewModel::userMessageShown,
         onNoteClick = onNoteClick,
         onAddClick = onAddClick,
+        onSettingsClick = onSettingsClick,
     )
 }
 
@@ -89,6 +92,7 @@ fun NotesScreen(
     onUserMessageShown: () -> Unit,
     onNoteClick: (Long) -> Unit,
     onAddClick: () -> Unit,
+    onSettingsClick: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -114,6 +118,9 @@ fun NotesScreen(
                 actions = {
                     IconButton(onClick = onRefresh, enabled = !uiState.isRefreshing) {
                         Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.notes_sync))
+                    }
+                    IconButton(onClick = onSettingsClick) {
+                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.notes_open_settings))
                     }
                 },
             )
@@ -156,6 +163,7 @@ fun NotesScreen(
                     items(uiState.notes, key = { it.id }) { note ->
                         NoteRow(
                             note = note,
+                            showBodyPreview = uiState.showBodyPreview,
                             onClick = { onNoteClick(note.id) },
                             onDelete = { onDelete(note.id) },
                         )
@@ -170,6 +178,7 @@ fun NotesScreen(
 @Composable
 private fun NoteRow(
     note: Note,
+    showBodyPreview: Boolean,
     onClick: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -187,7 +196,7 @@ private fun NoteRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            if (note.body.isNotBlank()) {
+            if (showBodyPreview && note.body.isNotBlank()) {
                 Text(
                     text = note.body,
                     style = MaterialTheme.typography.bodyMedium,
@@ -229,6 +238,7 @@ private fun NotesScreenPreview() {
             onUserMessageShown = {},
             onNoteClick = {},
             onAddClick = {},
+            onSettingsClick = {},
         )
     }
 }
@@ -245,6 +255,7 @@ private fun NotesScreenEmptyPreview() {
             onUserMessageShown = {},
             onNoteClick = {},
             onAddClick = {},
+            onSettingsClick = {},
         )
     }
 }

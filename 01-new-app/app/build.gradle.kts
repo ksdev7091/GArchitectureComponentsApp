@@ -19,7 +19,8 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        // Hilt のテスト用 Application を使うカスタムランナー(src/androidTest/.../HiltTestRunner.kt)
+        testInstrumentationRunner = "com.example.archnotes.HiltTestRunner"
     }
 
     buildTypes {
@@ -78,6 +79,9 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     ksp(libs.androidx.room.compiler)
 
+    // --- Data層: DataStore(ユーザー設定) ---
+    implementation(libs.androidx.datastore.preferences)
+
     // --- Data層: ネットワーク(Retrofit + OkHttp + kotlinx.serialization) ---
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.kotlinx.serialization)
@@ -98,6 +102,14 @@ dependencies {
     testImplementation(libs.okhttp.mockwebserver) // Retrofit 実装を本物の HTTP で検証する
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.kotlinx.coroutines.test)
+    // Compose UI テスト(状態なし Composable を単体で描いて検証する)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.ui.test.junit4)
+    debugImplementation(libs.androidx.ui.test.manifest)
+    // Hilt のテスト(@HiltAndroidTest / @TestInstallIn でモジュールを差し替える)
+    androidTestImplementation(libs.hilt.android.testing)
+    kspAndroidTest(libs.hilt.compiler)
     debugImplementation(libs.androidx.ui.tooling)
 }

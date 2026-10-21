@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.archnotes.R
 import com.example.archnotes.data.NotesRepository
+import com.example.archnotes.data.preferences.UserPreferencesRepository
 import com.example.archnotes.domain.GetNotesUseCase
 import com.example.archnotes.model.Note
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,6 +32,8 @@ data class NotesUiState(
     val query: String = "",
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
+    /** 設定画面で変えられる。設定の Flow から導くので、画面間で値を受け渡すコードはない */
+    val showBodyPreview: Boolean = true,
     @StringRes val userMessageRes: Int? = null,
 )
 
@@ -53,6 +56,7 @@ data class NotesUiState(
 class NotesViewModel @Inject constructor(
     private val getNotes: GetNotesUseCase,
     private val notesRepository: NotesRepository,
+    userPreferencesRepository: UserPreferencesRepository,
 ) : ViewModel() {
 
     // UI から変更される「入力」はそれぞれ独立した StateFlow として持つ
@@ -74,12 +78,19 @@ class NotesViewModel @Inject constructor(
      *   画面回転のような短い中断では止めないので、再購読時に即座に最新値が返る。
      */
     val uiState: StateFlow<NotesUiState> =
-        combine(notes, query, isRefreshing, userMessageRes) { notes, query, refreshing, messageRes ->
+        combine(
+            notes,
+            query,
+            isRefreshing,
+            userMessageRes,
+            userPreferencesRepository.userPreferences,
+        ) { notes, query, refreshing, messageRes, preferences ->
             NotesUiState(
                 notes = notes,
                 query = query,
                 isLoading = false,
                 isRefreshing = refreshing,
+                showBodyPreview = preferences.showBodyPreview,
                 userMessageRes = messageRes,
             )
         }.stateIn(

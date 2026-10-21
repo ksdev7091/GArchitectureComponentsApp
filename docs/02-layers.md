@@ -71,7 +71,8 @@ UI 層は 2 種類の部品でできています。
 4. **UseCase は他の UseCase に依存してよい**(階層にする)
 
 → [GetNotesUseCase](../01-new-app/app/src/main/java/com/example/archnotes/domain/GetNotesUseCase.kt)
-   このアプリの検索は単純で、本来 ViewModel 内でも書けます。「Domain 層を置くとこうなる」を示すためにあえて切り出しています。
+   メモの Repository と設定の Repository を `combine` して「検索 → ユーザーの並び順で並べ替え」を行う。
+   2 つの Repository の組み合わせ方を ViewModel に書くと一覧画面の ViewModel が肥大化し、別の画面で同じ一覧が要るときに複製することになる。
    02-refactor-legacy には Domain 層がありません。Todo アプリの規模では不要だからです。これも正しい判断です。
 
 ## Data 層 (Data layer)
@@ -82,8 +83,8 @@ Data 層は 2 種類の部品でできています。
 
 | 部品 | 担当 | 例 |
 |---|---|---|
-| Repository | 1 種類のデータについての公開 API。複数の DataSource を組み合わせる | `NotesRepository` |
-| DataSource | 1 つの出どころ(DB、API、ファイル)だけを扱う | `NoteDao`(Room), `NoteRemoteDataSource` |
+| Repository | 1 種類のデータについての公開 API。複数の DataSource を組み合わせる | `NotesRepository`, `UserPreferencesRepository` |
+| DataSource | 1 つの出どころ(DB、API、ファイル、DataStore)だけを扱う | `NoteDao`(Room), `NoteRemoteDataSource`, `DataStore<Preferences>` |
 
 ### ルール
 

@@ -2,6 +2,8 @@ package com.example.archnotes.data.di
 
 import com.example.archnotes.data.NotesRepository
 import com.example.archnotes.data.OfflineFirstNotesRepository
+import com.example.archnotes.data.preferences.DataStoreUserPreferencesRepository
+import com.example.archnotes.data.preferences.UserPreferencesRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -23,4 +25,7 @@ abstract class DataModule {
 
     @Binds
     abstract fun bindNotesRepository(impl: OfflineFirstNotesRepository): NotesRepository
+
+    @Binds
+    abstract fun bindUserPreferencesRepository(impl: DataStoreUserPreferencesRepository): UserPreferencesRepository
 }

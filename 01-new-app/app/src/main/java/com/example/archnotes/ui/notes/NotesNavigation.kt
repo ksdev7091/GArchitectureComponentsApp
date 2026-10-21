@@ -22,12 +22,14 @@ object NotesRoute
 fun NavGraphBuilder.notesScreen(
     onNoteClick: (Long) -> Unit,
     onAddClick: () -> Unit,
+    onSettingsClick: () -> Unit,
 ) {
     composable<NotesRoute> { entry ->
         fun isResumed() = entry.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
         NotesScreen(
             onNoteClick = { noteId -> if (isResumed()) onNoteClick(noteId) },
             onAddClick = { if (isResumed()) onAddClick() },
+            onSettingsClick = { if (isResumed()) onSettingsClick() },
         )
     }
 }
