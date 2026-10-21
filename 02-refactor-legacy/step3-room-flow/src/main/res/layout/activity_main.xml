@@ -1,41 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  targetSdk 35 以上ではアプリは edge-to-edge(システムバーの裏まで描画)で動く。
+  View ベースの画面では、ルートに fitsSystemWindows を付けてステータスバーとアクションバーの分だけ
+  コンテンツを下げる必要がある(付けないと入力欄がアクションバーの裏に隠れる)。
+  fitsSystemWindows は付けた View の padding をインセットで上書きするので、
+  見た目の padding は内側の LinearLayout に持たせている。
+  Step 5 の Compose では Scaffold の innerPadding が同じ役割を担う。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp">
-
-    <TextView
-        android:id="@+id/summary_text"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textAppearance="?attr/textAppearanceListItem" />
+    android:fitsSystemWindows="true">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:padding="16dp">
 
-        <EditText
-            android:id="@+id/input"
-            android:layout_width="0dp"
+        <TextView
+            android:id="@+id/summary_text"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:hint="@string/input_hint"
-            android:inputType="text"
-            android:maxLines="1" />
+            android:textAppearance="?attr/textAppearanceListItem" />
 
-        <Button
-            android:id="@+id/add_button"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/add" />
+            android:orientation="horizontal">
+
+            <EditText
+                android:id="@+id/input"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="@string/input_hint"
+                android:inputType="text"
+                android:maxLines="1" />
+
+            <Button
+                android:id="@+id/add_button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/add" />
+        </LinearLayout>
+
+        <ListView
+            android:id="@+id/todo_list"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1" />
+
     </LinearLayout>
 
-    <ListView
-        android:id="@+id/todo_list"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-
-</LinearLayout>
+</FrameLayout>

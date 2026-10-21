@@ -56,6 +56,13 @@ src/test                                       ●      =
 「=」の多さが、層を分けたことの見返りです。
 Step 3 で DB を Room に変えても MainActivity は無変更、Step 5 で UI を Compose に変えても ViewModel とテストは無変更です。
 
+## 実機で確認するときの注意
+
+targetSdk 35 以上のアプリは edge-to-edge(システムバーの裏まで描画)で動きます。
+Step 0〜4 の View ベースの画面では、`activity_main.xml` のルートに `android:fitsSystemWindows="true"` を付けて
+ステータスバーとアクションバーの分だけコンテンツを下げています。これが無いと入力欄と「追加」ボタンがアクションバーの裏に隠れます
+(Android 16 の実機で実際に起きた不具合です)。Step 5 の Compose では `Scaffold` の `innerPadding` が同じ役割を担います。
+
 ## 単体テスト
 
 ```bash
