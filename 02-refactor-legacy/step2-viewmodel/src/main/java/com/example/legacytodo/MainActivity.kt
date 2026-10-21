@@ -1,0 +1,75 @@
+package com.example.legacytodo
+
+import android.os.Bundle
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ListView
+import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
+import com.example.legacytodo.ui.TodoAdapter
+import com.example.legacytodo.ui.TodoUiState
+import com.example.legacytodo.ui.TodoViewModel
+import kotlinx.coroutines.launch
+
+/**
+ * 【Step 2: ViewModel と UI 状態を導入する】
+ *
+ * Activity の仕事は 2 つだけになった:
+ * 1. ViewModel の状態([TodoUiState])を受け取って画面に描く([render])
+ * 2. ユーザー操作を ViewModel のメソッド呼び出しに変換する
+ *
+ * これが「単方向データフロー(UDF)」。状態は ViewModel → Activity へ、
+ * イベントは Activity → ViewModel へ、それぞれ一方向にしか流れない。
+ * Activity はもう `todos` を持たないし、DB のことも集計のことも知らない。
+ */
+class MainActivity : AppCompatActivity() {
+
+    // 画面回転しても同じインスタンスが返ってくる
+    private val viewModel: TodoViewModel by viewModels { TodoViewModel.Factory }
+
+    private lateinit var summaryText: TextView
+    private lateinit var input: EditText
+    private lateinit var adapter: TodoAdapter
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
+
+        summaryText = findViewById(R.id.summary_text)
+        input = findViewById(R.id.input)
+        adapter = TodoAdapter(
+            onDoneChange = { id, isDone -> viewModel.setDone(id, isDone) },
+            onDelete = { id -> viewModel.deleteTodo(id) },
+        )
+        findViewById<ListView>(R.id.todo_list).adapter = adapter
+
+        findViewById<Button>(R.id.add_button).setOnClickListener {
+            viewModel.addTodo(input.text.toString())
+            input.text.clear()
+        }
+
+        // 画面が表示されている間(STARTED 以上)だけ状態を購読する。
+        // バックグラウンドに回ったら自動で購読を止め、戻ったら再開する。
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel.uiState.collect { state -> render(state) }
+            }
+        }
+    }
+
+    /** 状態 → 画面。ここには「判断」を書かない。状態をそのまま映すだけ。 */
+    private fun render(state: TodoUiState) {
+        adapter.submit(state.todos)
+        summaryText.text = getString(R.string.summary_format, state.totalCount, state.doneCount)
+
+        state.errorMessageRes?.let { messageRes ->
+            Toast.makeText(this, messageRes, Toast.LENGTH_SHORT).show()
+            viewModel.errorMessageShown() // 表示し終えたことを伝え、二重表示を防ぐ
+        }
+    }
+}

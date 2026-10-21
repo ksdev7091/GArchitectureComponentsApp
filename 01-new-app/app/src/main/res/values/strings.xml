@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">ArchNotes</string>
+
+    <!-- 一覧画面 -->
+    <string name="notes_title">ArchNotes</string>
+    <string name="notes_search_hint">タイトル・本文で検索</string>
+    <string name="notes_empty">メモがありません。右下の + から追加するか、同期ボタンでサーバーのメモを取り込んでください。</string>
+    <string name="notes_sync">サーバーと同期</string>
+    <string name="notes_add">メモを追加</string>
+    <string name="notes_delete">削除</string>
+    <string name="notes_refresh_failed">同期に失敗しました（疑似ネットワークエラー）。もう一度お試しください。</string>
+    <string name="notes_deleted">メモを削除しました</string>
+
+    <!-- 編集画面 -->
+    <string name="editor_title_new">新しいメモ</string>
+    <string name="editor_title_edit">メモを編集</string>
+    <string name="editor_title_hint">タイトル</string>
+    <string name="editor_body_hint">本文</string>
+    <string name="editor_save">保存</string>
+    <string name="editor_back">戻る</string>
+</resources>

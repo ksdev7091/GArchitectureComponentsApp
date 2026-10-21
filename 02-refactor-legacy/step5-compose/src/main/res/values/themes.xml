@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose では AppCompat のテーマが不要。システムテーマを使い、見た目は MaterialTheme で決める -->
+    <style name="Theme.LegacyTodo" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
