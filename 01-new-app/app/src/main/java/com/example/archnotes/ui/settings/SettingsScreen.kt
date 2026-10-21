@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -96,9 +97,15 @@ fun SettingsScreen(
                 )
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+            // 行全体をタップ対象にする(文字をタップしても切り替わる)。Switch 自体のクリックは null にして二重処理を避ける
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .toggleable(
+                        value = uiState.showBodyPreview,
+                        role = Role.Switch,
+                        onValueChange = onShowBodyPreviewChange,
+                    )
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -108,7 +115,7 @@ fun SettingsScreen(
                 )
                 Switch(
                     checked = uiState.showBodyPreview,
-                    onCheckedChange = onShowBodyPreviewChange,
+                    onCheckedChange = null,
                 )
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
